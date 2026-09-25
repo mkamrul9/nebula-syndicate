@@ -1,4 +1,15 @@
+using Microsoft.EntityFrameworkCore;
+using Nebula.Server.Data;
+
 var builder = WebApplication.CreateBuilder(args);
+
+// Add PostgreSQL DbContext
+builder.Services.AddDbContext<NebulaDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        // Tell EF Core where to output the migration files
+        b => b.MigrationsAssembly("Nebula.Server") 
+    ));
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

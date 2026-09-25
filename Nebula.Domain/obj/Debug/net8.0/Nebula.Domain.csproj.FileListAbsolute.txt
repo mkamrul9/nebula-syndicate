@@ -1,0 +1,11 @@
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\bin\Debug\net8.0\Nebula.Domain.deps.json
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\bin\Debug\net8.0\Nebula.Domain.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\bin\Debug\net8.0\Nebula.Domain.pdb
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.AssemblyInfoInputs.cache
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.AssemblyInfo.cs
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.csproj.CoreCompileInputs.cache
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\refint\Nebula.Domain.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.pdb
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\ref\Nebula.Domain.dll

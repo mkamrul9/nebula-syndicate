@@ -3,6 +3,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nebula.Server", "Nebula.Server\Nebula.Server.csproj", "{F686B153-6D5E-467E-96BF-7CCE38EA2066}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nebula.Client", "Nebula.Client\Nebula.Client.csproj", "{35CAF5C8-3121-416D-9906-4C73CA75BFAD}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nebula.Shared", "Nebula.Shared\Nebula.Shared.csproj", "{3BE76C1C-A5D4-42C8-809F-CF2C790EF829}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nebula.Domain", "Nebula.Domain\Nebula.Domain.csproj", "{4B67599F-7FD1-4ACB-93B8-A45D7A294E70}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -10,5 +18,23 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F686B153-6D5E-467E-96BF-7CCE38EA2066}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F686B153-6D5E-467E-96BF-7CCE38EA2066}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F686B153-6D5E-467E-96BF-7CCE38EA2066}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F686B153-6D5E-467E-96BF-7CCE38EA2066}.Release|Any CPU.Build.0 = Release|Any CPU
+		{35CAF5C8-3121-416D-9906-4C73CA75BFAD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{35CAF5C8-3121-416D-9906-4C73CA75BFAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{35CAF5C8-3121-416D-9906-4C73CA75BFAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{35CAF5C8-3121-416D-9906-4C73CA75BFAD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3BE76C1C-A5D4-42C8-809F-CF2C790EF829}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BE76C1C-A5D4-42C8-809F-CF2C790EF829}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BE76C1C-A5D4-42C8-809F-CF2C790EF829}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BE76C1C-A5D4-42C8-809F-CF2C790EF829}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B67599F-7FD1-4ACB-93B8-A45D7A294E70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B67599F-7FD1-4ACB-93B8-A45D7A294E70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B67599F-7FD1-4ACB-93B8-A45D7A294E70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B67599F-7FD1-4ACB-93B8-A45D7A294E70}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

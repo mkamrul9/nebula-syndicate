@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "Tv1Z6PMaLosEOHKY61rO7X/tihXoSzf5e+f3fCKy7/o=",
+  "Source": "Nebula.Server",
+  "BasePath": "_content/Nebula.Server",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

@@ -1,0 +1,11 @@
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\bin\Debug\net8.0\Nebula.Shared.deps.json
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\bin\Debug\net8.0\Nebula.Shared.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\bin\Debug\net8.0\Nebula.Shared.pdb
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.GeneratedMSBuildEditorConfig.editorconfig
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.AssemblyInfoInputs.cache
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.AssemblyInfo.cs
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.csproj.CoreCompileInputs.cache
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\refint\Nebula.Shared.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.pdb
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\ref\Nebula.Shared.dll
