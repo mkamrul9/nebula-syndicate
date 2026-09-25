@@ -58,6 +58,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add SignalR services
+builder.Services.AddSignalR(); 
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -123,6 +126,9 @@ app.MapGet("/weatherforecast", () =>
 })
 .WithName("GetWeatherForecast")
 .WithOpenApi();
+
+// Map the GameHub to a route
+app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
 app.Run();
 
