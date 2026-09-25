@@ -113,3 +113,12 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\obj\Debug\net8.0\refint\Nebula.Server
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\obj\Debug\net8.0\Nebula.Server.pdb
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\obj\Debug\net8.0\Nebula.Server.genruntimeconfig.cache
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\obj\Debug\net8.0\ref\Nebula.Server.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\BCrypt-Net-Next.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Abstractions.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Logging.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll

@@ -1,0 +1,57 @@
+@* File: Nebula.Client/Pages/Lobby.razor *@
+@page "/lobby"
+@using Nebula.Client.Services
+@implements IDisposable
+@inject GameConnectionManager GameManager
+
+<h3>Syndicate Lobby</h3>
+
+@if (GameManager.IsConnected)
+{
+    <span class="badge bg-success">Connected to Game Server</span>
+    <button class="btn btn-primary mt-3" @onclick="JoinQueue">Find Match</button>
+}
+else
+{
+    <span class="badge bg-warning">Connecting...</span>
+}
+
+<div class="mt-4">
+    <h5>System Logs:</h5>
+    <ul>
+        @foreach (var log in _logs)
+        {
+            <li>@log</li>
+        }
+    </ul>
+</div>
+
+@code {
+    private List<string> _logs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Subscribe to events
+        GameManager.OnSystemMessageReceived += HandleSystemMessage;
+        
+        // Start connection
+        await GameManager.ConnectAsync();
+    }
+
+    private async Task JoinQueue()
+    {
+        await GameManager.JoinMatchQueue();
+    }
+
+    private void HandleSystemMessage(string message)
+    {
+        _logs.Add($"{DateTime.Now:T}: {message}");
+        InvokeAsync(StateHasChanged); // Force Blazor to re-render the UI
+    }
+
+    public void Dispose()
+    {
+        // ALWAYS unsubscribe to prevent memory leaks in Blazor
+        GameManager.OnSystemMessageReceived -= HandleSystemMessage;
+    }
+}

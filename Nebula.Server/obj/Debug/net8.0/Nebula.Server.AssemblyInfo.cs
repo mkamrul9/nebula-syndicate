@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Nebula.Server")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9b6801b45f1e685b0b65953b6f5b5674edb574bb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9e20d19956c0ed89b79cc4edbb1e00b7f4b87ceb")]
 [assembly: System.Reflection.AssemblyProductAttribute("Nebula.Server")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Nebula.Server")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
