@@ -35,19 +35,39 @@ namespace Nebula.Server.Services
                 // Process all matches concurrently
                 await Parallel.ForEachAsync(activeMatches, stoppingToken, async (state, token) =>
                 {
-                    // 1. Process Game Logic (Mocked for now, implemented in Phase 11 & 12)
+                    if (state.Status != GameStatus.InProgress) return;
+
                     state.CurrentTick++;
+
+                    // Define our base rates (e.g., per second)
+                    const double IroniumPerDronePerSec = 2.0;
+                    const double PlasmaPerDronePerSec = 0.5;
                     
-                    // (Example: Slowly give everyone passive credits every 10 ticks)
-                    if (state.CurrentTick % 10 == 0)
+                    // Calculate how much to give PER TICK (10 ticks a second = divide by 10)
+                    // 1000ms / TickIntervalMilliseconds (100) = 10 ticks per second
+                    double ticksPerSecond = 1000.0 / TickIntervalMilliseconds; 
+                    
+                    double ironiumYieldPerTick = IroniumPerDronePerSec / ticksPerSecond;
+                    double plasmaYieldPerTick = PlasmaPerDronePerSec / ticksPerSecond;
+
+                    // Process all players in this match
+                    foreach (var player in state.Players.Values)
                     {
-                        foreach (var player in state.Players.Values)
+                        // 1. Skip generation if the player is under a sabotage effect (e.g., EMP)
+                        if (player.IsEmpMuted) continue;
+
+                        // 2. Aggregate Resource Generation
+                        player.Ironium += player.ActiveIroniumDrones * ironiumYieldPerTick;
+                        player.Plasma += player.ActivePlasmaDrones * plasmaYieldPerTick;
+                        
+                        // (Optional) Passive credit drip for being alive
+                        if (state.CurrentTick % (int)ticksPerSecond == 0) // Once every second
                         {
-                            player.Credits += 5; 
+                            player.Credits += 5.0m;
                         }
                     }
 
-                    // 2. Broadcast the updated state to the specific match group
+                    // Broadcast the updated state to the specific match group
                     await _hubContext.Clients.Group(state.MatchId)
                         .ReceiveGameStateTick(state);
                 });

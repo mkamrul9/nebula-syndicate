@@ -24,11 +24,19 @@ namespace Nebula.Shared.Models
     public class PlayerState
     {
         public string PlayerName { get; set; } = string.Empty;
-        public int Credits { get; set; }
-        public int Ironium { get; set; } // Example Resource
-        public int ActiveDrones { get; set; }
-        public bool IsEmpMuted { get; set; } // Status effect
         public bool IsConnected { get; set; } = true;
         public DateTime? DisconnectedAt { get; set; } 
+        
+        // Use decimal for exact currency arithmetic (preventing floating point drift with money)
+        public decimal Credits { get; set; } 
+        
+        // Use double for continuous physical resources
+        public double Ironium { get; set; }
+        public double Plasma { get; set; }
+        
+        public int ActiveIroniumDrones { get; set; }
+        public int ActivePlasmaDrones { get; set; }
+        
+        public bool IsEmpMuted { get; set; } 
     }
 }

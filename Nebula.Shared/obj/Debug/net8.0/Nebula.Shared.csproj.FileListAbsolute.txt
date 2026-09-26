@@ -9,3 +9,4 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\refint\Nebula.Shared.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.pdb
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\ref\Nebula.Shared.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Shared\obj\Debug\net8.0\Nebula.Shared.sourcelink.json

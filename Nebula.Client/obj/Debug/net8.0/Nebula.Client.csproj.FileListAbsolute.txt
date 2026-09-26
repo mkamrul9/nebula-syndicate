@@ -1083,3 +1083,4 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\m7wdf4649
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\79patf7sr0.gz
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\a7q839ag6z.gz
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\nz73h8lyj1.gz
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\Nebula.Client.sourcelink.json

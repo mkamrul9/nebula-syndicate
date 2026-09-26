@@ -24,9 +24,11 @@ namespace Nebula.Server.Services
                 state.Players[id] = new PlayerState
                 {
                     PlayerName = $"Extractor_{id[..5]}", // Temporary name fallback
-                    Credits = 1000,
-                    Ironium = 0,
-                    ActiveDrones = 2,
+                    Credits = 1000m,
+                    Ironium = 0.0,
+                    Plasma = 0.0,
+                    ActiveIroniumDrones = 2,
+                    ActivePlasmaDrones = 0,
                     IsEmpMuted = false
                 };
             }

@@ -9,3 +9,4 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\refint\Nebula.Domain.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.pdb
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\ref\Nebula.Domain.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Domain\obj\Debug\net8.0\Nebula.Domain.sourcelink.json
