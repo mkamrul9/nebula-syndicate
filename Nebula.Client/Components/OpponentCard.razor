@@ -1,0 +1,62 @@
+@* File: Nebula.Client/Components/OpponentCard.razor *@
+@using Nebula.Shared.Models
+
+<div class="mb-3 border-bottom border-dark pb-3">
+    <h6>@OpponentState.PlayerName 
+        @if(!OpponentState.IsConnected) { <span class="badge bg-warning text-dark">OFFLINE</span> }
+        @if(OpponentState.IsEmpMuted) { <span class="badge bg-dark text-danger blink">EMP'D</span> }
+    </h6>
+    <div class="small text-light mb-2">
+        Ironium Drones: @OpponentState.ActiveIroniumDrones | Plasma Drones: @OpponentState.ActivePlasmaDrones
+    </div>
+    
+    <button class="btn btn-sm btn-dark text-danger w-100 fw-bold border-danger"
+            disabled="@IsLaunchDisabled"
+            @onclick="OnLaunchClicked">
+        LAUNCH EMP (₡2000)
+    </button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlayerState OpponentState { get; set; } = default!;
+
+    [Parameter]
+    public bool IsLaunchDisabled { get; set; }
+
+    [Parameter]
+    public EventCallback OnLaunchClicked { get; set; }
+
+    // Track the previous state to compare against
+    private int _prevFeDrones;
+    private int _prevPlDrones;
+    private bool _prevEmpStatus;
+    private bool _prevConnectedStatus;
+    private bool _prevDisabledStatus;
+
+    // Short-circuit the expensive DOM diffing algorithm
+    protected override bool ShouldRender()
+    {
+        // Only allow Blazor to spend CPU cycles updating this specific component's HTML 
+        // if the visual data has actually changed since the last tick.
+        bool hasChanged = 
+            _prevFeDrones != OpponentState.ActiveIroniumDrones ||
+            _prevPlDrones != OpponentState.ActivePlasmaDrones ||
+            _prevEmpStatus != OpponentState.IsEmpMuted ||
+            _prevConnectedStatus != OpponentState.IsConnected ||
+            _prevDisabledStatus != IsLaunchDisabled;
+
+        if (hasChanged)
+        {
+            _prevFeDrones = OpponentState.ActiveIroniumDrones;
+            _prevPlDrones = OpponentState.ActivePlasmaDrones;
+            _prevEmpStatus = OpponentState.IsEmpMuted;
+            _prevConnectedStatus = OpponentState.IsConnected;
+            _prevDisabledStatus = IsLaunchDisabled;
+            return true;
+        }
+
+        // The state is identical to the last 100ms. Do not re-render the DOM.
+        return false;
+    }
+}

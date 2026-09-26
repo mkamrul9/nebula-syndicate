@@ -6,6 +6,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Production-only optimizations -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- Compile C# directly to WebAssembly bytecode -->
+    <RunAOTCompilation>true</RunAOTCompilation>
+    
+    <!-- Strip unused framework code to shrink the payload -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>link</TrimMode>
+    
+    <!-- Disable timezone/globalization data if your game doesn't need it -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.30" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.30" PrivateAssets="all" />
