@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Nebula.Server.Data;
 using Nebula.Domain.Entities;
 using Nebula.Shared.Models;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,9 @@ builder.Services.AddDbContext<NebulaDbContext>(options =>
         // Tell EF Core where to output the migration files
         b => b.MigrationsAssembly("Nebula.Server") 
     ));
+
+var redisConnection = builder.Configuration.GetConnectionString("Redis");
+builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection!));
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -171,6 +175,23 @@ api.MapGet("/history", async (ClaimsPrincipal user, NebulaDbContext db, int page
         .ToListAsync();
 
     return Results.Ok(history);
+});
+
+app.MapGet("/api/leaderboard", async (IConnectionMultiplexer redis) =>
+{
+    var db = redis.GetDatabase();
+    
+    // Fetch the top 50 players (0 to 49) in descending order
+    var topPlayers = await db.SortedSetRangeByRankWithScoresAsync("leaderboard:wins", 0, 49, Order.Descending);
+
+    var result = topPlayers.Select((entry, index) => new
+    {
+        Rank = index + 1,
+        Username = entry.Element.ToString(),
+        Wins = (int)entry.Score
+    });
+
+    return Results.Ok(result);
 });
 
 // Map the GameHub to a route

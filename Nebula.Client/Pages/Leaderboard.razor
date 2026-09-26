@@ -1,0 +1,67 @@
+@* File: Nebula.Client/Pages/Leaderboard.razor *@
+@page "/leaderboard"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="container mt-4 text-light">
+    <h2 class="text-warning mb-4 text-center">GLOBAL SYNDICATE RANKINGS</h2>
+
+    @if (_leaderboard == null)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border text-warning" role="status"></div>
+        </div>
+    }
+    else
+    {
+        <div class="card bg-dark border-warning mx-auto" style="max-width: 800px;">
+            <div class="card-body p-0">
+                <table class="table table-dark table-striped table-hover mb-0">
+                    <thead class="text-warning">
+                        <tr>
+                            <th class="text-center" style="width: 10%;">Rank</th>
+                            <th>Commander</th>
+                            <th class="text-end" style="width: 20%;">Total Wins</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var player in _leaderboard)
+                        {
+                            <tr>
+                                <td class="text-center fw-bold text-muted">#@player.Rank</td>
+                                <td class="fw-bold @(player.Rank <= 3 ? "text-warning" : "text-light")">
+                                    @if(player.Rank == 1) { <span>👑 </span> }
+                                    @player.Username
+                                </td>
+                                <td class="text-end font-monospace text-success">@player.Wins</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<LeaderboardEntry>? _leaderboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _leaderboard = await Http.GetFromJsonAsync<List<LeaderboardEntry>>("api/leaderboard");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching leaderboard: {ex.Message}");
+        }
+    }
+
+    public class LeaderboardEntry
+    {
+        public int Rank { get; set; }
+        public string Username { get; set; } = string.Empty;
+        public int Wins { get; set; }
+    }
+}

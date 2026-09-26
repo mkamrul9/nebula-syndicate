@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Nebula.Shared.Models;
 using Nebula.Server.Data;
 using Nebula.Domain.Entities;
+using StackExchange.Redis;
 
 namespace Nebula.Server.Services
 {
@@ -58,7 +59,12 @@ namespace Nebula.Server.Services
                 }
 
                 await db.SaveChangesAsync(stoppingToken);
-                Console.WriteLine($"[DB] Match {state.MatchId} saved to PostgreSQL.");
+                
+                var redisDb = _serviceProvider.GetRequiredService<IConnectionMultiplexer>().GetDatabase();
+                var winnerUsername = state.Players[winnerId].PlayerName; 
+                await redisDb.SortedSetIncrementAsync("leaderboard:wins", winnerUsername, 1);
+                
+                Console.WriteLine($"[DB] Match {state.MatchId} saved to PostgreSQL and Redis.");
             }
         }
     }
