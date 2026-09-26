@@ -27,15 +27,36 @@ else
                         {
                             <h2 class="text-warning">₡ @Math.Floor(_myState.Credits)</h2>
                             <hr />
-                            <h5>Ironium: @Math.Floor(_myState.Ironium)</h5>
-                            <p class="text-muted small">Drones Active: @_myState.ActiveIroniumDrones</p>
                             
-                            <h5>Plasma: @Math.Floor(_myState.Plasma)</h5>
-                            <p class="text-muted small">Drones Active: @_myState.ActivePlasmaDrones</p>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h5>Ironium <span class="badge bg-secondary">@_myState.ActiveIroniumDrones Active</span></h5>
+                                    <p class="text-muted small mb-0">Stockpile: @Math.Floor(_myState.Ironium)</p>
+                                </div>
+                                <!-- Action Button -->
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
+                                        @onclick="@(() => HandleDeployClick("Ironium"))">
+                                    DEPLOY (₡500)
+                                </button>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h5>Plasma <span class="badge bg-info">@_myState.ActivePlasmaDrones Active</span></h5>
+                                    <p class="text-muted small mb-0">Stockpile: @Math.Floor(_myState.Plasma)</p>
+                                </div>
+                                <!-- Action Button -->
+                                <button class="btn btn-sm btn-outline-info" 
+                                        disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
+                                        @onclick="@(() => HandleDeployClick("Plasma"))">
+                                    DEPLOY (₡500)
+                                </button>
+                            </div>
                             
                             @if (_myState.IsEmpMuted)
                             {
-                                <div class="alert alert-danger blink-text">SYSTEMS DISABLED (EMP)</div>
+                                <div class="alert alert-danger blink-text">COMMAND UPLINK SEVERED (EMP ACTIVE)</div>
                             }
                         }
                     </div>
@@ -102,6 +123,30 @@ else
     
     private string _myPlayerId = string.Empty;
     private DateTime _lastRender = DateTime.MinValue;
+
+    private const decimal DroneCost = 500.0m;
+    private bool _isActionLocked = false;
+
+    // Local validation property
+    private bool CanAffordDrone => _myState != null && _myState.Credits >= DroneCost;
+
+    private async Task HandleDeployClick(string resource)
+    {
+        if (!CanAffordDrone || _isActionLocked) return;
+
+        // 1. Lock the UI instantly to prevent double-clicks
+        _isActionLocked = true;
+
+        // 2. Transmit command to server queue
+        await GameManager.DispatchDroneAsync(resource);
+
+        // 3. Keep locked just long enough for the server to process and send a new tick
+        await Task.Delay(200); 
+        _isActionLocked = false;
+        
+        // No StateHasChanged() needed here because HandleGameState 
+        // fires every 100-200ms anyway and will redraw the unlocked button.
+    }
 
     protected override async Task OnInitializedAsync()
     {

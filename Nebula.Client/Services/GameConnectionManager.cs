@@ -64,6 +64,14 @@ namespace Nebula.Client.Services
             }
         }
 
+        public async Task DispatchDroneAsync(string targetResource)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.SendAsync("DispatchDrone", targetResource);
+            }
+        }
+
         // Method for the UI to send commands to the server
         public async Task JoinMatchQueue()
         {
