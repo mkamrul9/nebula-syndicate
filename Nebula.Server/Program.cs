@@ -54,6 +54,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                     // Read the token out of the query string
                     context.Token = accessToken;
                 }
+
+                // ONLY ALLOW THIS IN DEVELOPMENT OR STAGING
+                if (builder.Environment.IsDevelopment() || builder.Environment.IsStaging())
+                {
+                    if (context.Request.Headers.TryGetValue("X-Bot-Auth-Bypass", out var botName))
+                    {
+                        // Create a fake, trusted identity on the fly
+                        var claims = new[] 
+                        {
+                            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                            new Claim(ClaimTypes.Name, botName.ToString())
+                        };
+                        var identity = new ClaimsIdentity(claims, "BotAuth");
+                        context.Principal = new ClaimsPrincipal(identity);
+                        context.Success();
+                    }
+                }
+
                 return Task.CompletedTask;
             }
         };
