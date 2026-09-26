@@ -15,6 +15,7 @@ namespace Nebula.Client.Services
         public event Action<string>? OnSystemMessageReceived;
         public event Action<GameState>? OnGameStateUpdated;
         public event Action<ChatMessage>? OnChatMessageReceived;
+        public event Action<string>? OnMatchJoined;
         
         public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
 
@@ -47,6 +48,11 @@ namespace Nebula.Client.Services
             _hubConnection.On<ChatMessage>(nameof(IGameClient.ReceiveChatMessage), (message) =>
             {
                 OnChatMessageReceived?.Invoke(message);
+            });
+
+            _hubConnection.On<string>(nameof(IGameClient.MatchJoined), (matchId) =>
+            {
+                OnMatchJoined?.Invoke(matchId);
             });
         }
 

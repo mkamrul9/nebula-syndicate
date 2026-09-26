@@ -1,0 +1,71 @@
+@using Nebula.Client.Services
+@using Nebula.Shared.Models
+@implements IDisposable
+@inject GameConnectionManager GameManager
+
+<div class="chat-box border p-3" style="height: 300px; overflow-y: scroll;">
+    <h5>Global Comms</h5>
+    @foreach (var msg in _chatHistory)
+    {
+        <div class="mb-1">
+            <span class="text-muted">[@msg.Timestamp.ToString("HH:mm:ss")]</span> 
+            @if(msg.IsSystemEvent)
+            {
+                <span class="text-warning fw-bold">SYSTEM: @msg.Message</span>
+            }
+            else
+            {
+                <strong class="text-primary">@msg.SenderName:</strong> <span>@msg.Message</span>
+            }
+        </div>
+    }
+</div>
+
+<div class="input-group mt-2">
+    <input type="text" class="form-control" @bind="_chatInput" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Transmit message..." />
+    <button class="btn btn-secondary" @onclick="SendMessage">Send</button>
+</div>
+
+@code {
+    private string _chatInput = string.Empty;
+    private List<ChatMessage> _chatHistory = new();
+
+    protected override void OnInitialized()
+    {
+        GameManager.OnChatMessageReceived += HandleChat;
+    }
+
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(_chatInput))
+        {
+            await GameManager.SendChatMessage(_chatInput, "Global");
+            _chatInput = string.Empty;
+        }
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private void HandleChat(ChatMessage msg)
+    {
+        if (msg.Channel == "Global")
+        {
+            _chatHistory.Add(msg);
+            
+            if (_chatHistory.Count > 100) _chatHistory.RemoveAt(0);
+            
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        GameManager.OnChatMessageReceived -= HandleChat;
+    }
+}

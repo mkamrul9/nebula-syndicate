@@ -1,112 +1,76 @@
 @* File: Nebula.Client/Pages/Lobby.razor *@
 @page "/lobby"
 @using Nebula.Client.Services
-@using Nebula.Shared.Models
 @implements IDisposable
 @inject GameConnectionManager GameManager
+@inject NavigationManager NavManager
 
-<h3>Syndicate Lobby</h3>
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-8 text-center">
+            <h1 class="display-4 text-warning">NEBULA SYNDICATE</h1>
+            <p class="lead">Corporate Extractor Terminal</p>
 
-@if (GameManager.IsConnected)
-{
-    <span class="badge bg-success">Connected to Game Server</span>
-    <button class="btn btn-primary mt-3" @onclick="JoinQueue">Find Match</button>
-}
-else
-{
-    <span class="badge bg-warning">Connecting...</span>
-}
-
-<div class="chat-box mt-4 border p-3" style="height: 300px; overflow-y: scroll;">
-    <h5>Global Comms</h5>
-    @foreach (var msg in _chatHistory)
-    {
-        <div class="mb-1">
-            <span class="text-muted">[@msg.Timestamp.ToString("HH:mm:ss")]</span> 
-            @if(msg.IsSystemEvent)
-            {
-                <span class="text-warning fw-bold">SYSTEM: @msg.Message</span>
-            }
-            else
-            {
-                <strong class="text-primary">@msg.SenderName:</strong> <span>@msg.Message</span>
-            }
+            <div class="card bg-dark text-light border-secondary mt-4 p-5">
+                @if (!GameManager.IsConnected)
+                {
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <h4 class="mt-3">Establishing Uplink to Syndicate Servers...</h4>
+                }
+                else if (_isQueued)
+                {
+                    <div class="spinner-grow text-danger" role="status"></div>
+                    <h4 class="mt-3 text-danger">Searching for Rivals...</h4>
+                    <p class="text-muted">Stay on this frequency. Deployment is imminent.</p>
+                }
+                else
+                {
+                    <h4 class="text-success mb-4">Uplink Established. Ready for deployment.</h4>
+                    <button class="btn btn-danger btn-lg px-5 py-3 fw-bold" @onclick="JoinQueue">
+                        ENTER MATCHMAKING
+                    </button>
+                }
+            </div>
         </div>
-    }
-</div>
 
-<div class="input-group mt-2">
-    <input type="text" class="form-control" @bind="_chatInput" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Transmit message..." />
-    <button class="btn btn-secondary" @onclick="SendMessage">Send</button>
-</div>
-
-<div class="mt-4">
-    <h5>System Logs:</h5>
-    <ul>
-        @foreach (var log in _logs)
-        {
-            <li>@log</li>
-        }
-    </ul>
+        <div class="col-md-4">
+            @* We reuse the Global Chat built in Phase 10 here *@
+            <GlobalChatWidget /> 
+        </div>
+    </div>
 </div>
 
 @code {
-    private List<string> _logs = new();
-    private string _chatInput = string.Empty;
-    private List<ChatMessage> _chatHistory = new();
+    private bool _isQueued = false;
 
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to events
-        GameManager.OnSystemMessageReceived += HandleSystemMessage;
-        GameManager.OnChatMessageReceived += HandleChat;
+        // Subscribe to state changes and routing events
+        GameManager.OnMatchJoined += HandleMatchJoined;
         
-        // Start connection
-        await GameManager.ConnectAsync();
+        if (!GameManager.IsConnected)
+        {
+            await GameManager.ConnectAsync();
+        }
     }
 
     private async Task JoinQueue()
     {
+        _isQueued = true;
         await GameManager.JoinMatchQueue();
     }
 
-    private async Task SendMessage()
+    private void HandleMatchJoined(string matchId)
     {
-        if (!string.IsNullOrWhiteSpace(_chatInput))
-        {
-            await GameManager.SendChatMessage(_chatInput, "Global");
-            _chatInput = string.Empty;
-        }
-    }
-
-    private async Task HandleKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-        {
-            await SendMessage();
-        }
-    }
-
-    private void HandleSystemMessage(string message)
-    {
-        _logs.Add($"{DateTime.Now:T}: {message}");
-        InvokeAsync(StateHasChanged); // Force Blazor to re-render the UI
-    }
-
-    private void HandleChat(ChatMessage msg)
-    {
-        _chatHistory.Add(msg);
-        
-        // Keep memory footprint small
-        if (_chatHistory.Count > 100) _chatHistory.RemoveAt(0);
-        
-        InvokeAsync(StateHasChanged);
+        // The server found a match! Route the user to the game arena.
+        // We use InvokeAsync because SignalR events fire on a background thread,
+        // but NavigationManager must be called on the UI thread.
+        InvokeAsync(() => NavManager.NavigateTo($"/dashboard"));
     }
 
     public void Dispose()
     {
-        // ALWAYS unsubscribe to prevent memory leaks in Blazor
-        GameManager.OnSystemMessageReceived -= HandleSystemMessage;
-        GameManager.OnChatMessageReceived -= HandleChat;
+        // CRITICAL: Prevent memory leaks
+        GameManager.OnMatchJoined -= HandleMatchJoined;
     }
 }
