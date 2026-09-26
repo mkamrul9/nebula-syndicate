@@ -15,9 +15,14 @@ namespace Nebula.Server.Services
         // We need 2 players for a 1v1 match
         private const int PlayersRequired = 2; 
 
-        public MatchmakingService(IHubContext<GameHub, IGameClient> hubContext)
+        private readonly GameStateManager _gameStateManager;
+
+        public MatchmakingService(
+            IHubContext<GameHub, IGameClient> hubContext, 
+            GameStateManager gameStateManager)
         {
             _hubContext = hubContext;
+            _gameStateManager = gameStateManager;
         }
 
         // The Hub calls this method to add players
@@ -68,8 +73,8 @@ namespace Nebula.Server.Services
                     await _hubContext.Clients.Client(p.ConnectionId)
                         .ReceiveSystemMessage("Match found! Prepare for extraction.");
                 }
-
-                // TODO in Phase 7: Register this match with the Game State Manager
+                var playerIds = matchedPlayers.Select(p => p.PlayerId);
+                _gameStateManager.InitializeMatch(matchId, playerIds);
             }
             else
             {
