@@ -69,6 +69,9 @@ builder.Services.AddSingleton<GameStateManager>();
 builder.Services.AddSingleton<MatchmakingService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<MatchmakingService>());
 
+// Add the Game Tick Server
+builder.Services.AddHostedService<GameTickService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
