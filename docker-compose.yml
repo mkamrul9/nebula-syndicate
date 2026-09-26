@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  nebula-client:
+    build:
+      context: .
+      dockerfile: Nebula.Client/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - nebula-server
+
+  nebula-server:
+    build:
+      context: .
+      dockerfile: Nebula.Server/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=nebula-db;Database=NebulaSyndicate;Username=postgres;Password=supersecret
+      - ConnectionStrings__Redis=nebula-redis:6379,abortConnect=false
+      - Stripe__SecretKey=${STRIPE_SECRET_KEY}
+    depends_on:
+      - nebula-db
+      - nebula-redis
+
+  nebula-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=supersecret
+      - POSTGRES_DB=NebulaSyndicate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  nebula-redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
