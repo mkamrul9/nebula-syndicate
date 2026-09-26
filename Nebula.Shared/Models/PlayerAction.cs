@@ -5,13 +5,19 @@ namespace Nebula.Shared.Models
     {
         DeployDrone,
         SellResource,
-        UseSabotage
+        UseSabotage,
+        BuildDefense
     }
 
     public enum SabotageType
     {
         EMP,
         MarketVirus
+    }
+
+    public enum DefenseType
+    {
+        Firewall
     }
 
     public class PlayerAction
@@ -25,5 +31,8 @@ namespace Nebula.Shared.Models
         // For Sabotage actions
         public string TargetPlayerId { get; set; } = string.Empty; 
         public SabotageType? Sabotage { get; set; }
+
+        // For Defense actions
+        public DefenseType? Defense { get; set; }
     }
 }

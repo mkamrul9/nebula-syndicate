@@ -80,6 +80,14 @@ namespace Nebula.Client.Services
             }
         }
 
+        public async Task BuildDefenseAsync(DefenseType type)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.SendAsync("BuildDefense", type);
+            }
+        }
+
         // Method for the UI to send commands to the server
         public async Task JoinMatchQueue()
         {

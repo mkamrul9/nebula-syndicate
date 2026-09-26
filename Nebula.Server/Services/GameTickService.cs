@@ -71,6 +71,21 @@ namespace Nebula.Server.Services
                                 }
                             }
                         }
+                        else if (action.Type == ActionType.BuildDefense && action.Defense == DefenseType.Firewall)
+                        {
+                            const double IroniumCost = 150.0;
+                            const double PlasmaCost = 50.0;
+
+                            // Check physical resource balances
+                            if (player.Ironium >= IroniumCost && player.Plasma >= PlasmaCost)
+                            {
+                                player.Ironium -= IroniumCost;
+                                player.Plasma -= PlasmaCost;
+                                player.FirewallCharges++;
+                                
+                                // No system message needed here; the UI will just show the new charge
+                            }
+                        }
                         else if (action.Type == ActionType.UseSabotage && action.Sabotage == SabotageType.EMP)
                         {
                             const decimal EmpCost = 2000.0m;
@@ -81,12 +96,25 @@ namespace Nebula.Server.Services
                                 if (player.Credits >= EmpCost)
                                 {
                                     player.Credits -= EmpCost;
-                                    
-                                    // 100 ticks = 10 seconds (assuming 10 ticks per second)
-                                    var newExpiration = state.CurrentTick + 100;
-                                    
-                                    // Max clamping prevents overlapping EMPs from stacking infinitely
-                                    victim.EmpExpirationTick = Math.Max(victim.EmpExpirationTick, newExpiration);
+
+                                    // NEW LOGIC: Intercept with Firewall
+                                    if (victim.FirewallCharges > 0)
+                                    {
+                                        victim.FirewallCharges--;
+                                        
+                                        // Broadcast the interception so everyone knows what happened
+                                        await _hubContext.Clients.Group(state.MatchId)
+                                            .ReceiveSystemMessage($"NETWORK ALERT: {victim.PlayerName}'s Firewall absorbed an EMP from {player.PlayerName}!");
+                                    }
+                                    else
+                                    {
+                                        // Apply the EMP normally (from Phase 17)
+                                        var newExpiration = state.CurrentTick + 100;
+                                        victim.EmpExpirationTick = Math.Max(victim.EmpExpirationTick, newExpiration);
+                                        
+                                        await _hubContext.Clients.Group(state.MatchId)
+                                            .ReceiveSystemMessage($"CRITICAL: {victim.PlayerName} was disabled by an EMP!");
+                                    }
                                 }
                             }
                         }

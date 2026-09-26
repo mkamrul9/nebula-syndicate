@@ -56,5 +56,7 @@ namespace Nebula.Shared.Models
         
         // Helper property so the Blazor UI easily knows if it should disable buttons
         public bool IsEmpMuted { get; set; } 
+
+        public int FirewallCharges { get; set; }
     }
 }

@@ -66,6 +66,22 @@ else
                                     DEPLOY (₡500)
                                 </button>
                             </div>
+
+                            <div class="mt-4 p-3 bg-dark border border-secondary rounded">
+                                <h5>Defensive Systems</h5>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="text-info fw-bold">Active Firewalls: @_myState.FirewallCharges</span>
+                                    </div>
+                                    
+                                    <!-- Firewall costs physical resources, not Credits! -->
+                                    <button class="btn btn-sm btn-outline-light" 
+                                            disabled="@(!CanAffordFirewall || _isActionLocked || _myState.IsEmpMuted)"
+                                            @onclick="HandleBuildFirewall">
+                                        BUILD FIREWALL (150 Fe / 50 Pl)
+                                    </button>
+                                </div>
+                            </div>
                         }
                     </div>
                 </div>
@@ -147,6 +163,9 @@ else
     // Local validation property
     private bool CanAffordDrone => _myState != null && _myState.Credits >= DroneCost;
     private bool CanAffordEmp => _myState != null && _myState.Credits >= EmpCost;
+    private bool CanAffordFirewall => _myState != null && 
+                                      _myState.Ironium >= 150 && 
+                                      _myState.Plasma >= 50;
 
     private async Task HandleDeployClick(string resource)
     {
@@ -174,6 +193,16 @@ else
         await GameManager.LaunchSabotageAsync(targetId, type);
         
         // Brief local lock to prevent double-spending UI bugs
+        await Task.Delay(200);
+        _isActionLocked = false;
+    }
+
+    private async Task HandleBuildFirewall()
+    {
+        if (!CanAffordFirewall || _isActionLocked) return;
+
+        _isActionLocked = true;
+        await GameManager.BuildDefenseAsync(DefenseType.Firewall); 
         await Task.Delay(200);
         _isActionLocked = false;
     }

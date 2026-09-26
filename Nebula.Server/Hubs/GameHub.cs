@@ -176,5 +176,22 @@ namespace Nebula.Server.Hubs
                 Sabotage = type
             });
         }
+
+        public async Task BuildDefense(DefenseType type)
+        {
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            match?.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.BuildDefense,
+                Defense = type
+            });
+        }
     }
 }
