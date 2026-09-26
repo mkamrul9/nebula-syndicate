@@ -12,6 +12,14 @@ namespace Nebula.Shared.Models
         
         // Global market prices for resources
         public Dictionary<string, decimal> MarketPrices { get; set; } = new();
+        
+        // Tracks the current supply/demand momentum
+        // Negative = Oversupplied (Price dropping)
+        // Positive = High Demand (Price rising)
+        public Dictionary<string, decimal> MarketPressures { get; set; } = new();
+
+        // The "Default" price the market wants to return to when left alone
+        public Dictionary<string, decimal> BasePrices { get; set; } = new();
     }
 
     public enum GameStatus

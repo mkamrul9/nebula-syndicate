@@ -67,6 +67,38 @@ namespace Nebula.Server.Services
                         }
                     }
 
+                    // We only want to update the market once per second to make charts readable.
+                    // 10 ticks per second means modulo 10 == 0 is exactly one second.
+                    if (state.CurrentTick % 10 == 0)
+                    {
+                        var random = new Random(); // Note: Use thread-local Random in production
+
+                        // Process each resource market
+                        foreach (var resource in state.MarketPrices.Keys.ToList())
+                        {
+                            var currentPrice = state.MarketPrices[resource];
+                            var basePrice = state.BasePrices[resource];
+                            var currentPressure = state.MarketPressures[resource];
+
+                            // 1. Mean Reversion: The market naturally wants to pull back to its BasePrice.
+                            // If price is high, reversion is negative. If low, reversion is positive.
+                            var reversionForce = (basePrice - currentPrice) * 0.05m; // 5% pull per second
+
+                            // 2. Random Volatility: A slight noise between -1% and +1%
+                            var volatility = currentPrice * (decimal)((random.NextDouble() * 0.02) - 0.01);
+
+                            // 3. Calculate New Price
+                            var newPrice = currentPrice + reversionForce + volatility + currentPressure;
+
+                            // 4. Hard Clamping: Prevent negative prices and hyperinflation
+                            newPrice = Math.Clamp(newPrice, 5.0m, 10000.0m);
+                            state.MarketPrices[resource] = Math.Round(newPrice, 2); // 2 decimal places max
+
+                            // 5. Decay Pressure: Player influence fades over time
+                            state.MarketPressures[resource] *= 0.90m; // 10% decay per second
+                        }
+                    }
+
                     // Broadcast the updated state to the specific match group
                     await _hubContext.Clients.Group(state.MatchId)
                         .ReceiveGameStateTick(state);

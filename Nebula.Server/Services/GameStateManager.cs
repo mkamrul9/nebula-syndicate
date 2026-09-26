@@ -34,9 +34,13 @@ namespace Nebula.Server.Services
             }
 
             // Initialize the starting market economy for this specific match
+            state.BasePrices["Ironium"] = 50.0m;
             state.MarketPrices["Ironium"] = 50.0m;
+            state.MarketPressures["Ironium"] = 0.0m;
+
+            state.BasePrices["Plasma"] = 150.0m;
             state.MarketPrices["Plasma"] = 150.0m;
-            state.MarketPrices["DarkMatter"] = 500.0m;
+            state.MarketPressures["Plasma"] = 0.0m;
 
             // Safely add to the concurrent dictionary
             _activeGames.TryAdd(matchId, state);
