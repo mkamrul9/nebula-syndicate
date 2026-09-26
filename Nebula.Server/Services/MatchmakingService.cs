@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 using Nebula.Server.Hubs;
 using Nebula.Server.Models;
 using Nebula.Shared.Interfaces;
+using Nebula.Server.AI;
+using Nebula.Shared.Models;
 
 namespace Nebula.Server.Services
 {
@@ -66,6 +68,16 @@ namespace Nebula.Server.Services
                 {
                     await TryCreateMatch();
                 }
+                else if (_queue.Count == 1) // Only one player waiting
+                {
+                    if (_queue.TryPeek(out var player))
+                    {
+                        if ((DateTime.UtcNow - player.JoinedAt).TotalSeconds > 60)
+                        {
+                            await TryCreateBotMatch();
+                        }
+                    }
+                }
 
                 // Prevent the tight loop from maxing out the CPU
                 await Task.Delay(1000, stoppingToken); 
@@ -113,6 +125,38 @@ namespace Nebula.Server.Services
                 {
                     _queue.Enqueue(p);
                 }
+            }
+        }
+
+        private async Task TryCreateBotMatch()
+        {
+            if (_queue.TryDequeue(out var human))
+            {
+                var matchId = Guid.NewGuid().ToString();
+                var queue = new ConcurrentQueue<PlayerAction>();
+                var bot = new AiBotController(queue);
+
+                Console.WriteLine($"[Matchmaker] Player {human.PlayerId} timed out. Provisioning AI Bot Match {matchId}.");
+
+                await _hubContext.Groups.AddToGroupAsync(human.ConnectionId, matchId);
+                
+                await _hubContext.Clients.Client(human.ConnectionId).MatchJoined(matchId);
+                await _hubContext.Clients.Client(human.ConnectionId)
+                    .ReceiveSystemMessage("Match found! Prepare for extraction.");
+
+                var playerIds = new[] { human.PlayerId, bot.BotId };
+                _gameStateManager.InitializeMatch(matchId, playerIds);
+                
+                var state = _gameStateManager.GetMatch(matchId);
+                if (state != null)
+                {
+                    state.ActiveBot = bot;
+                    state.PendingActions = queue;
+                    state.Players[human.PlayerId].PlayerName = "Human Extractor";
+                    state.Players[bot.BotId].PlayerName = "Syndicate AI";
+                }
+
+                _tracker.AssignPlayerToMatch(human.PlayerId, matchId);
             }
         }
     }

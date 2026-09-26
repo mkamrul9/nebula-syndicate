@@ -59,6 +59,12 @@ namespace Nebula.Server.Services
 
                     state.CurrentTick++;
 
+                    if (state.ActiveBot != null)
+                    {
+                        // Let the bot look at the board and queue actions before we process the queue
+                        state.ActiveBot.Update(state);
+                    }
+
                     // 1. EVALUATE DEBUFFS FOR ALL PLAYERS
                     foreach (var p in state.Players.Values)
                     {

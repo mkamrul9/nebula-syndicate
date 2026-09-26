@@ -1,4 +1,5 @@
-// File: Nebula.Shared/Models/GameState.cs
+using Nebula.Shared.Interfaces;
+
 namespace Nebula.Shared.Models
 {
     public class GameState
@@ -29,6 +30,9 @@ namespace Nebula.Shared.Models
 
         [System.Text.Json.Serialization.JsonIgnore] // Don't send this over SignalR!
         public List<ReplayFrame> ReplayFrames { get; set; } = new();
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public IAiBotController? ActiveBot { get; set; }
     }
 
     public enum GameStatus
