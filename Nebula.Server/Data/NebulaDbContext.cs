@@ -11,6 +11,7 @@ namespace Nebula.Server.Data
         public DbSet<PlayerProfile> Players { get; set; }
         public DbSet<MatchRecord> MatchRecords { get; set; }
         public DbSet<Guild> Guilds { get; set; }
+        public DbSet<PlayerQuest> PlayerQuests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

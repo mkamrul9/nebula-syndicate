@@ -4,6 +4,7 @@ using Nebula.Shared.Models;
 using Nebula.Server.Data;
 using Nebula.Domain.Entities;
 using StackExchange.Redis;
+using Microsoft.EntityFrameworkCore;
 
 namespace Nebula.Server.Services
 {
@@ -50,14 +51,49 @@ namespace Nebula.Server.Services
 
                 db.MatchRecords.Add(record);
                 
-                // Update player global stats
-                foreach (var playerId in state.Players.Keys)
+                // Update player global stats and Quests
+                foreach (var playerEntry in state.Players)
                 {
-                    var profile = await db.Players.FindAsync(Guid.Parse(playerId));
+                    var playerIdStr = playerEntry.Key;
+                    var playerState = playerEntry.Value;
+                    var playerId = Guid.Parse(playerIdStr);
+                    
+                    var profile = await db.Players.FindAsync(new object[] { playerId }, cancellationToken: stoppingToken);
                     if (profile != null)
                     {
                         profile.TotalMatchesPlayed++;
-                        if (playerId == winnerId) profile.TotalWins++;
+                        if (playerIdStr == winnerId) profile.TotalWins++;
+                    }
+
+                    // Fetch active (unexpired) quests for this player
+                    var activeQuests = await db.Set<PlayerQuest>()
+                        .Where(q => q.PlayerId == playerId && q.ExpirationDateUTC > DateTime.UtcNow && !q.IsClaimed)
+                        .ToListAsync(stoppingToken);
+
+                    foreach (var quest in activeQuests)
+                    {
+                        if (quest.IsCompleted) continue;
+
+                        switch (quest.Type)
+                        {
+                            case QuestType.PlayMatches:
+                                quest.CurrentValue += 1;
+                                break;
+                            case QuestType.WinMatches:
+                                if (playerIdStr == winnerId) quest.CurrentValue += 1;
+                                break;
+                            case QuestType.DeployDrones:
+                                // Tally the total drones they had at the end of the match
+                                quest.CurrentValue += (playerState.ActiveIroniumDrones + playerState.ActivePlasmaDrones);
+                                break;
+                            case QuestType.UseSabotage:
+                                // To do: tracking sabotage usage might require extending the replay frame or state.
+                                break;
+                        }
+
+                        // Clamp the value so it doesn't exceed the target
+                        if (quest.CurrentValue > quest.TargetValue) 
+                            quest.CurrentValue = quest.TargetValue;
                     }
                 }
 

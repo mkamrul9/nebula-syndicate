@@ -316,6 +316,42 @@ guildApi.MapPost("/vault/donate", async (DonateDto request, ClaimsPrincipal user
     }
 });
 
+var questApi = app.MapGroup("/api/quests").RequireAuthorization();
+
+questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    
+    // Use a transaction to prevent double-claiming via concurrent requests
+    using var transaction = await db.Database.BeginTransactionAsync();
+
+    try
+    {
+        var quest = await db.Set<PlayerQuest>().FirstOrDefaultAsync(q => q.Id == questId && q.PlayerId == userId);
+        
+        if (quest == null) return Results.NotFound();
+        if (!quest.IsCompleted) return Results.BadRequest("Quest not completed yet.");
+        if (quest.IsClaimed) return Results.BadRequest("Reward already claimed.");
+
+        var player = await db.Players.FindAsync(userId);
+        if (player == null) return Results.NotFound();
+
+        // Apply reward and mark claimed
+        player.PremiumCredits += quest.RewardCredits;
+        quest.IsClaimed = true;
+
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Results.Ok(new { NewBalance = player.PremiumCredits });
+    }
+    catch
+    {
+        await transaction.RollbackAsync();
+        return Results.StatusCode(500);
+    }
+});
+
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
