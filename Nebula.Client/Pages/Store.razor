@@ -1,38 +1,75 @@
 @page "/store"
+@using Nebula.Shared.Models
 @inject HttpClient Http
-@inject NavigationManager NavManager
-@using System.Net.Http.Json
 
-<div class="container text-center text-light mt-5">
-    <h2 class="text-warning mb-4">SYNDICATE EXCHANGE</h2>
-    
-    <div class="card bg-dark border-warning mx-auto p-4" style="max-width: 400px;">
-        <h3>1,000 Syndicate Coins</h3>
-        <p class="lead text-success fw-bold">$5.00 USD</p>
-        <button class="btn btn-warning btn-lg w-100 fw-bold" @onclick="BuyCredits" disabled="@_isProcessing">
-            @if (_isProcessing) { <span class="spinner-border spinner-border-sm"></span> }
-            else { <span>PURCHASE WITH STRIPE</span> }
-        </button>
+<div class="container text-light mt-4">
+    <div class="d-flex justify-content-between align-items-center border-bottom border-warning pb-2 mb-4">
+        <h2 class="text-warning mb-0">BLACK MARKET COSMETICS</h2>
+        <h4 class="text-success mb-0">Balance: @_balance Coins</h4>
+    </div>
+
+    <div class="row">
+        @foreach (var item in _availableItems)
+        {
+            <div class="col-md-3 mb-4">
+                <div class="card bg-dark border-secondary h-100 text-center">
+                    <!-- Placeholder for the actual graphic -->
+                    <div class="card-img-top bg-black p-4 text-info font-monospace">
+                        [ @item.AssetRef ]
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="text-white">@item.Name</h5>
+                        <p class="text-muted small flex-grow-1">@item.Description</p>
+                        
+                        @if (item.IsOwned)
+                        {
+                            <button class="btn @(item.IsEquipped ? "btn-success" : "btn-outline-light") mt-2"
+                                    @onclick="() => EquipItem(item.Id)">
+                                @(item.IsEquipped ? "EQUIPPED" : "EQUIP")
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-warning mt-2 fw-bold" @onclick="() => BuyItem(item.Id)">
+                                BUY (@item.PriceInCoins 🪙)
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 </div>
 
 @code {
-    private bool _isProcessing = false;
+    private int _balance = 0; // In reality, fetch this on load
+    private List<StoreItemDto> _availableItems = new();
 
-    private async Task BuyCredits()
+    // DTO for the UI view
+    public class StoreItemDto 
     {
-        _isProcessing = true;
-        
-        var response = await Http.PostAsync("api/payments/checkout", null);
-        if (response.IsSuccessStatusCode)
-        {
-            var result = await response.Content.ReadFromJsonAsync<CheckoutResponse>();
-            // Redirect the browser entirely to the Stripe hosted page
-            NavManager.NavigateTo(result!.Url); 
-        }
-        
-        _isProcessing = false;
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int PriceInCoins { get; set; }
+        public string AssetRef { get; set; } = string.Empty;
+        public bool IsOwned { get; set; }
+        public bool IsEquipped { get; set; }
     }
 
-    public class CheckoutResponse { public string Url { get; set; } = string.Empty; }
+    private async Task BuyItem(int itemId)
+    {
+        var response = await Http.PostAsync($"api/store/buy/{itemId}", null);
+        if (response.IsSuccessStatusCode)
+        {
+            // Refresh store state
+            // ... logic to reload _availableItems and _balance ...
+        }
+    }
+
+    private async Task EquipItem(int itemId)
+    {
+        await Http.PostAsync($"api/store/equip/{itemId}", null);
+        // Refresh store state to show the new "EQUIPPED" status
+    }
 }

@@ -13,6 +13,8 @@ namespace Nebula.Server.Data
         public DbSet<Guild> Guilds { get; set; }
         public DbSet<PlayerQuest> PlayerQuests { get; set; }
         public DbSet<PremiumLedgerEntry> PremiumLedgerEntries { get; set; }
+        public DbSet<CosmeticItem> CosmeticItems { get; set; }
+        public DbSet<PlayerCosmetic> PlayerCosmetics { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,6 +36,15 @@ namespace Nebula.Server.Data
                 .WithMany(g => g.Members)
                 .HasForeignKey(p => p.GuildId)
                 .OnDelete(DeleteBehavior.SetNull); // If guild is deleted, players just become guildless
+
+            modelBuilder.Entity<PlayerCosmetic>()
+                .HasKey(pc => new { pc.PlayerId, pc.CosmeticItemId });
+
+            // Seed cosmetics
+            modelBuilder.Entity<CosmeticItem>().HasData(
+                new CosmeticItem { Id = 1, Name = "Neon Crimson", Description = "A red neon glowing drone skin.", Type = CosmeticType.DroneSkin, PriceInCoins = 500, AssetRef = "drone-neon-crimson" },
+                new CosmeticItem { Id = 2, Name = "Gold Elite", Description = "Premium gold plated avatar.", Type = CosmeticType.Avatar, PriceInCoins = 1000, AssetRef = "avatar-gold-elite" }
+            );
         }
     }
 }

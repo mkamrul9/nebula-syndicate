@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "Nebula.Client",
   "resources": {
-    "hash": "sha256-GdU5wqv76ACrb/3K9NO0J2g5JN/N8d5jVDaH/5+2PVk=",
+    "hash": "sha256-lEg5BSgOErj9X0d/Hjgg9ByywAeZ6D0uquU/F1pAwjM=",
     "jsModuleNative": {
       "dotnet.native.8.0.30.9d0prlvuxh.js": "sha256-dexsp+9ih2C28zVhNnPXUbkz2QCq7lHpkyDcmaLl7NQ="
     },
@@ -217,12 +217,12 @@
       "mscorlib.wasm": "sha256-pP80UGziulDYhvVdeUaGEq9FlrHQDQmnCqVvx1FJZis=",
       "netstandard.wasm": "sha256-ARMsMyhWuSDjvzisfZbnEptnxh8Vh7VpHPhuT6iazy0=",
       "System.Private.CoreLib.wasm": "sha256-+28m4yuZsdz9ij1sJHvNH896fSI8gXgrQ9bhGO76Qqo=",
-      "Nebula.Shared.wasm": "sha256-SJ9i634BzhH7JC8aIMapWZBacJF/J+BoQyPJTsPsIGQ=",
-      "Nebula.Client.wasm": "sha256-4vavuTnrRqHikHypaxaezYafNdhWqCUTXhy1Bjfd13A="
+      "Nebula.Shared.wasm": "sha256-Ey3JLFgFOribQYNoSy4mC2WK4LGv81qXqayLA4Mv5cM=",
+      "Nebula.Client.wasm": "sha256-Y6bcddBTmhPrC8CksWTKRCqdf9cddEgNuJ+OWOlRweM="
     },
     "pdb": {
-      "Nebula.Shared.pdb": "sha256-IOb7YhoeUVHHHm6h3JcyeUEHZODBKES0+lTiVGh9dLA=",
-      "Nebula.Client.pdb": "sha256-oTphcq05v/48uerx6fhtxIJuA5S+XM6Rel6nD03VJl8="
+      "Nebula.Shared.pdb": "sha256-+aHh37cmbqdlocIqTjV6t1RGt/racHB/xKdX3G6QnKw=",
+      "Nebula.Client.pdb": "sha256-9bvmRq4cwMNP3k6b5cCPpk5o/v0DHyrbp7wUzRN73FQ="
     }
   },
   "cacheBootResources": true,

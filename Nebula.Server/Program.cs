@@ -347,6 +347,73 @@ questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, 
     }
 });
 
+var storeApi = app.MapGroup("/api/store").RequireAuthorization();
+
+storeApi.MapPost("/buy/{itemId}", async (int itemId, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    // 1. Fetch the item definition from the database
+    var item = await db.Set<CosmeticItem>().FindAsync(itemId);
+    if (item == null) return Results.NotFound("Item does not exist.");
+
+    // 2. Check if the player already owns it
+    var alreadyOwns = await db.Set<PlayerCosmetic>()
+        .AnyAsync(pc => pc.PlayerId == userId && pc.CosmeticItemId == itemId);
+    if (alreadyOwns) return Results.BadRequest("You already own this item.");
+
+    // 3. We use the PremiumCurrencyService which handles its own internal transaction and ledger!
+    // We pass a negative amount because it's a purchase.
+    var success = await premiumService.AdjustBalanceAsync(
+        userId, 
+        -item.PriceInCoins, 
+        Nebula.Domain.Entities.TransactionType.StorePurchase, 
+        $"Cosmetic_{itemId}"
+    );
+
+    if (!success) return Results.BadRequest("Insufficient Syndicate Coins.");
+
+    // 4. Add the item to their inventory
+    var inventoryRecord = new PlayerCosmetic
+    {
+        PlayerId = userId,
+        CosmeticItemId = itemId
+    };
+
+    db.Set<PlayerCosmetic>().Add(inventoryRecord);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { Message = "Purchase successful!", Item = item.Name });
+});
+
+storeApi.MapPost("/equip/{itemId}", async (int itemId, ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    var inventoryItem = await db.Set<PlayerCosmetic>()
+        .Include(pc => pc.Item)
+        .FirstOrDefaultAsync(pc => pc.PlayerId == userId && pc.CosmeticItemId == itemId);
+
+    if (inventoryItem == null) return Results.BadRequest("You do not own this item.");
+
+    // Unequip any currently equipped items of the same type
+    var equippedOfSameType = await db.Set<PlayerCosmetic>()
+        .Include(pc => pc.Item)
+        .Where(pc => pc.PlayerId == userId && pc.IsEquipped && pc.Item!.Type == inventoryItem.Item!.Type)
+        .ToListAsync();
+
+    foreach (var eq in equippedOfSameType)
+    {
+        eq.IsEquipped = false;
+    }
+
+    // Equip the new item
+    inventoryItem.IsEquipped = true;
+    await db.SaveChangesAsync();
+
+    return Results.Ok();
+});
+
 var paymentsApi = app.MapGroup("/api/payments");
 
 // 1. Endpoint to start the checkout process (Requires Auth)
