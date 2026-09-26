@@ -39,7 +39,14 @@ namespace Nebula.Server.Services
 
                     state.CurrentTick++;
 
-                    // 1. PROCESS ACTION QUEUE
+                    // 1. EVALUATE DEBUFFS FOR ALL PLAYERS
+                    foreach (var p in state.Players.Values)
+                    {
+                        // Automatically flips to false when the current tick surpasses the expiration
+                        p.IsEmpMuted = state.CurrentTick < p.EmpExpirationTick;
+                    }
+
+                    // 2. PROCESS ACTION QUEUE
                     // Drain the queue of all actions that came in during the last 100ms
                     while (state.PendingActions.TryDequeue(out var action))
                     {
@@ -64,7 +71,26 @@ namespace Nebula.Server.Services
                                 }
                             }
                         }
-                        // ... logic for SellResource and UseSabotage will go here later
+                        else if (action.Type == ActionType.UseSabotage && action.Sabotage == SabotageType.EMP)
+                        {
+                            const decimal EmpCost = 2000.0m;
+                            
+                            // Ensure the target actually exists in this match
+                            if (state.Players.TryGetValue(action.TargetPlayerId, out var victim))
+                            {
+                                if (player.Credits >= EmpCost)
+                                {
+                                    player.Credits -= EmpCost;
+                                    
+                                    // 100 ticks = 10 seconds (assuming 10 ticks per second)
+                                    var newExpiration = state.CurrentTick + 100;
+                                    
+                                    // Max clamping prevents overlapping EMPs from stacking infinitely
+                                    victim.EmpExpirationTick = Math.Max(victim.EmpExpirationTick, newExpiration);
+                                }
+                            }
+                        }
+                        // ... logic for SellResource will go here later
                     }
 
                     // Define our base rates (e.g., per second)

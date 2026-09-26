@@ -156,5 +156,25 @@ namespace Nebula.Server.Hubs
                 TargetResource = targetNodeId
             });
         }
+
+        public async Task LaunchSabotage(string targetPlayerId, SabotageType type)
+        {
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            if (match == null) return;
+
+            match.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.UseSabotage,
+                TargetPlayerId = targetPlayerId,
+                Sabotage = type
+            });
+        }
     }
 }

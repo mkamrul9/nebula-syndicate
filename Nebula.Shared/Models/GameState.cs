@@ -51,6 +51,10 @@ namespace Nebula.Shared.Models
         public int ActiveIroniumDrones { get; set; }
         public int ActivePlasmaDrones { get; set; }
         
+        // Replaces the simple boolean with a tick-based tracker
+        public int EmpExpirationTick { get; set; }
+        
+        // Helper property so the Blazor UI easily knows if it should disable buttons
         public bool IsEmpMuted { get; set; } 
     }
 }
