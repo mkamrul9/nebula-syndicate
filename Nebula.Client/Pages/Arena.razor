@@ -194,28 +194,57 @@ else
 
     private async Task HandleDeployClick(string resource)
     {
-        if (!CanAffordDrone || _isActionLocked) return;
+        if (!CanAffordDrone || _isActionLocked || _myState == null) return;
 
         // 1. Lock the UI instantly to prevent double-clicks
         _isActionLocked = true;
 
-        // 2. Transmit command to server queue
-        await GameManager.DispatchDroneAsync(resource);
+        // 2. CLIENT-SIDE PREDICTION: Optimistically update the UI instantly
+        _myState.Credits -= DroneCost;
+        if (resource == "Ironium") _myState.ActiveIroniumDrones++;
+        if (resource == "Plasma") _myState.ActivePlasmaDrones++;
+        
+        // Force the browser to draw the new numbers immediately (0ms latency!)
+        StateHasChanged(); 
 
-        // 3. Keep locked just long enough for the server to process and send a new tick
+        try
+        {
+            // 3. Transmit the intent to the authoritative server
+            await GameManager.DispatchDroneAsync(resource);
+        }
+        catch
+        {
+            // If the network call completely fails, rollback the prediction
+            _myState.Credits += DroneCost;
+            if (resource == "Ironium") _myState.ActiveIroniumDrones--;
+            if (resource == "Plasma") _myState.ActivePlasmaDrones--;
+            StateHasChanged();
+        }
+
+        // 4. Brief cooldown before accepting next input
         await Task.Delay(200); 
         _isActionLocked = false;
-        
-        // No StateHasChanged() needed here because HandleGameState 
-        // fires every 100-200ms anyway and will redraw the unlocked button.
     }
 
     private async Task HandleSabotageClick(string targetId, SabotageType type)
     {
-        if (!CanAffordEmp || _isActionLocked) return;
+        if (!CanAffordEmp || _isActionLocked || _myState == null) return;
 
         _isActionLocked = true;
-        await GameManager.LaunchSabotageAsync(targetId, type);
+        
+        // PREDICTION: Instantly deduct credits. 
+        _myState.Credits -= EmpCost;
+        StateHasChanged();
+        
+        try
+        {
+            await GameManager.LaunchSabotageAsync(targetId, type);
+        }
+        catch
+        {
+            _myState.Credits += EmpCost;
+            StateHasChanged();
+        }
         
         // Brief local lock to prevent double-spending UI bugs
         await Task.Delay(200);
@@ -224,10 +253,28 @@ else
 
     private async Task HandleBuildFirewall()
     {
-        if (!CanAffordFirewall || _isActionLocked) return;
+        if (!CanAffordFirewall || _isActionLocked || _myState == null) return;
 
         _isActionLocked = true;
-        await GameManager.BuildDefenseAsync(DefenseType.Firewall); 
+        
+        // PREDICTION:
+        _myState.Ironium -= 150;
+        _myState.Plasma -= 50;
+        _myState.FirewallCharges++;
+        StateHasChanged();
+        
+        try
+        {
+            await GameManager.BuildDefenseAsync(DefenseType.Firewall); 
+        }
+        catch
+        {
+            _myState.Ironium += 150;
+            _myState.Plasma += 50;
+            _myState.FirewallCharges--;
+            StateHasChanged();
+        }
+        
         await Task.Delay(200);
         _isActionLocked = false;
     }
