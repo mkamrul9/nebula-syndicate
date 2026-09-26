@@ -202,6 +202,36 @@ namespace Nebula.Server.Services
                         }
                     }
 
+                    // Capture a replay keyframe every 10 ticks (1 second)
+                    if (state.CurrentTick % 10 == 0)
+                    {
+                        var frame = new ReplayFrame
+                        {
+                            Tick = state.CurrentTick,
+                            Market = new Dictionary<string, decimal>
+                            {
+                                { "Ironium", state.MarketPrices.ContainsKey("Ironium") ? state.MarketPrices["Ironium"] : 0 },
+                                { "Plasma", state.MarketPrices.ContainsKey("Plasma") ? state.MarketPrices["Plasma"] : 0 }
+                            }
+                        };
+
+                        foreach (var p in state.Players)
+                        {
+                            // Pack stats tightly into an array to save JSON space
+                            frame.PlayerStats[p.Key] = new double[]
+                            {
+                                (double)p.Value.Credits,
+                                p.Value.Ironium,
+                                p.Value.Plasma,
+                                p.Value.ActiveIroniumDrones,
+                                p.Value.ActivePlasmaDrones,
+                                p.Value.EmpExpirationTick
+                            };
+                        }
+
+                        state.ReplayFrames.Add(frame);
+                    }
+
                     const decimal VictoryThreshold = 50000.0m;
                     bool matchEnded = false;
                     string? winnerId = null;

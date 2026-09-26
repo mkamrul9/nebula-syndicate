@@ -13,5 +13,8 @@ namespace Nebula.Domain.Entities
 
         // Store the final state as a JSON document for post-match analytics
         public string FinalStateJson { get; set; } = string.Empty; 
+        
+        // The time-series array of ReplayFrames
+        public string ReplayDataJson { get; set; } = string.Empty; 
     }
 }

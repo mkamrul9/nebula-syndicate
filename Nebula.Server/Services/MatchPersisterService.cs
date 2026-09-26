@@ -42,7 +42,10 @@ namespace Nebula.Server.Services
                     DurationInSeconds = state.CurrentTick / 10, // Assuming 10 ticks/sec
                     EndedAt = DateTime.UtcNow,
                     ParticipantIds = state.Players.Keys.Select(Guid.Parse).ToList(),
-                    FinalStateJson = System.Text.Json.JsonSerializer.Serialize(state)
+                    FinalStateJson = System.Text.Json.JsonSerializer.Serialize(state),
+                    
+                    // NEW: Serialize the compressed frame array
+                    ReplayDataJson = System.Text.Json.JsonSerializer.Serialize(state.ReplayFrames) 
                 };
 
                 db.MatchRecords.Add(record);

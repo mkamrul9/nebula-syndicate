@@ -123,3 +123,8 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityMo
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\obj\Debug\net8.0\Nebula.Server.sourcelink.json
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\RESPite.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\StackExchange.Redis.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\System.Diagnostics.DiagnosticSource.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\System.IO.Hashing.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\System.IO.Pipelines.dll

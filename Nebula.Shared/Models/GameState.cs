@@ -26,6 +26,9 @@ namespace Nebula.Shared.Models
         // to prevent this from being serialized and sent to the client!
         [System.Text.Json.Serialization.JsonIgnore] 
         public System.Collections.Concurrent.ConcurrentQueue<PlayerAction> PendingActions { get; set; } = new();
+
+        [System.Text.Json.Serialization.JsonIgnore] // Don't send this over SignalR!
+        public List<ReplayFrame> ReplayFrames { get; set; } = new();
     }
 
     public enum GameStatus
