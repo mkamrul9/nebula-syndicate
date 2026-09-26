@@ -15,6 +15,9 @@ namespace Nebula.Domain.Entities
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        [System.ComponentModel.DataAnnotations.ConcurrencyCheck]
+        public Guid Version { get; set; } = Guid.NewGuid();
+
         public Guid? GuildId { get; set; }
         public Guild? Guild { get; set; } // EF Core Navigation property
         

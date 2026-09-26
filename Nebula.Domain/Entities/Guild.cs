@@ -10,6 +10,14 @@ namespace Nebula.Domain.Entities
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // The Syndicate Vault
+        public int VaultCredits { get; set; }
+        public int VaultIronium { get; set; }
+        
+        // Concurrency token to prevent dupe glitches during simultaneous updates
+        [System.ComponentModel.DataAnnotations.ConcurrencyCheck]
+        public Guid Version { get; set; } = Guid.NewGuid(); 
+
         // Navigation property for EF Core
         public ICollection<PlayerProfile> Members { get; set; } = new List<PlayerProfile>();
     }

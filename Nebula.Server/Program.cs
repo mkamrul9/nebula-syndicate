@@ -261,6 +261,61 @@ guildApi.MapPost("/leave", async (ClaimsPrincipal user, NebulaDbContext db) =>
     return Results.Ok();
 });
 
+guildApi.MapPost("/vault/donate", async (DonateDto request, ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    
+    // 1. Begin a strict database transaction
+    using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+
+    try
+    {
+        // 2. Fetch records
+        var player = await db.Players.FindAsync(userId);
+        if (player == null || player.GuildId == null) 
+            return Results.BadRequest("Not in a syndicate.");
+
+        var guild = await db.Guilds.FindAsync(player.GuildId);
+        if (guild == null) 
+            return Results.NotFound();
+
+        // 3. Validate logic
+        if (request.Amount <= 0) 
+            return Results.BadRequest("Invalid amount.");
+            
+        if (player.PremiumCredits < request.Amount) 
+            return Results.BadRequest("Insufficient funds.");
+
+        // 4. Perform the transfer
+        player.PremiumCredits -= request.Amount;
+        guild.VaultCredits += request.Amount;
+
+        // Update concurrency tokens so other simultaneous transactions fail
+        player.Version = Guid.NewGuid();
+        guild.Version = Guid.NewGuid();
+
+        // 5. Save changes
+        await db.SaveChangesAsync();
+        
+        // 6. Commit the transaction ONLY if SaveChangesAsync succeeded without concurrency exceptions
+        await transaction.CommitAsync();
+
+        return Results.Ok(new { NewBalance = player.PremiumCredits, VaultTotal = guild.VaultCredits });
+    }
+    catch (DbUpdateConcurrencyException)
+    {
+        // A hacker (or lag) tried to double-spend at the exact same millisecond.
+        // The transaction automatically rolls back.
+        await transaction.RollbackAsync();
+        return Results.Conflict("Transaction collision detected. Please try again.");
+    }
+    catch (Exception)
+    {
+        await transaction.RollbackAsync();
+        return Results.StatusCode(500);
+    }
+});
+
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
@@ -268,3 +323,4 @@ app.Run();
 
 // Define DTO inline for brevity
 public record CreateGuildDto(string Name, string Tag);
+public record DonateDto(int Amount);
