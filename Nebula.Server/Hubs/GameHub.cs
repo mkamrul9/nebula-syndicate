@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Nebula.Shared.Interfaces;
 using Nebula.Shared.Models;
+using Nebula.Server.Services;
+using Nebula.Server.Models;
 
 namespace Nebula.Server.Hubs
 {
@@ -10,15 +12,26 @@ namespace Nebula.Server.Hubs
     [Authorize] 
     public class GameHub : Hub<IGameClient>
     {
+        private readonly MatchmakingService _matchmaker;
+
+        public GameHub(MatchmakingService matchmaker)
+        {
+            _matchmaker = matchmaker;
+        }
+
         // Client calls this to queue for a match
         public async Task JoinMatchQueue()
         {
-            var playerId = Context.UserIdentifier; 
-            // TODO in Phase 6: Add player to Matchmaking Service
+            var playerId = Context.UserIdentifier ?? "Guest"; 
+            var connectionId = Context.ConnectionId;
+
+            _matchmaker.EnqueuePlayer(new QueuedPlayer
+            {
+                PlayerId = playerId,
+                ConnectionId = connectionId
+            });
             
-            // For now, just echo back a dummy match ID
-            await Clients.Caller.MatchJoined("dummy-match-123");
-            await Clients.Caller.ReceiveSystemMessage("Searching for syndicate rivals...");
+            await Clients.Caller.ReceiveSystemMessage("Entered matchmaking queue. Searching for rivals...");
         }
 
         // Client calls this to take an action in-game

@@ -1,7 +1,7 @@
 {
   "mainAssemblyName": "Nebula.Client",
   "resources": {
-    "hash": "sha256-N2Ah5t9Dq9gMCla9Dq8wtzeSK3oBSHz62+BGmEdyQFI=",
+    "hash": "sha256-1f3+9f2qKAEhu8d9yjPBSOivREppQA1XY2EL8xKHv7Y=",
     "jsModuleNative": {
       "dotnet.native.8.0.30.9d0prlvuxh.js": "sha256-dexsp+9ih2C28zVhNnPXUbkz2QCq7lHpkyDcmaLl7NQ="
     },
@@ -17,12 +17,20 @@
       "icudt_no_CJK.dat": "sha256-L7sV7NEYP37/Qr2FPCePo5cJqRgTXRwGHuwF5Q+0Nfs="
     },
     "assembly": {
+      "Blazored.LocalStorage.wasm": "sha256-OaMAAd5n7ORfyur5e3QIyEVKJ76MKIvwbg7/icnnYcU=",
       "Microsoft.AspNetCore.Authorization.wasm": "sha256-kNA4LdCjpjYaNwuaPjXH5rkLdQCQheCHKBRCg12PObE=",
       "Microsoft.AspNetCore.Components.wasm": "sha256-WQ/bjSHMARyN7IFeEANYE85F7yGtcrD8+SYLcZhim/s=",
       "Microsoft.AspNetCore.Components.Forms.wasm": "sha256-3jb/NCqRtOTCmzxUvGkrEBiuExv6Y0JL88TJOs87RVQ=",
       "Microsoft.AspNetCore.Components.Web.wasm": "sha256-i2uFMEHSmPSseWHpyZJvotuPzZ5vuKSfMnmV7JDSk8I=",
       "Microsoft.AspNetCore.Components.WebAssembly.wasm": "sha256-pm4zDkNK3kAVXHMMBza2FQUT/k3A/0PB4mBFZPEmauU=",
+      "Microsoft.AspNetCore.Connections.Abstractions.wasm": "sha256-a9OQi+Fs76AoOuLQDZPERjnSjlOks6ZwqxcXpGvnIOw=",
+      "Microsoft.AspNetCore.Http.Connections.Client.wasm": "sha256-jP8mnZCeS40JQ8HvwYmpgxcrVfiLriWf6PTLtLT8Dy4=",
+      "Microsoft.AspNetCore.Http.Connections.Common.wasm": "sha256-5z6avdO5E0DHR3tPAnL/trbRjxYsxz9SS4eXrwC1LiE=",
       "Microsoft.AspNetCore.Metadata.wasm": "sha256-EAjfPmFK9KeP7CN6yHSz150JVXVZYSNy6s7Kou7c8sY=",
+      "Microsoft.AspNetCore.SignalR.Client.wasm": "sha256-kcvgJgUH4aDvNOwUlu4TjWmu1m5dHgFgKY2iWIONc4k=",
+      "Microsoft.AspNetCore.SignalR.Client.Core.wasm": "sha256-go4kb6rPYkBdaKsWUlsHQysF+cj7cKG1sUpI5yXQAUI=",
+      "Microsoft.AspNetCore.SignalR.Common.wasm": "sha256-KfMCYbsm4teKvJ++fjX5wyigV4KIZu6Ru6CgwtetROk=",
+      "Microsoft.AspNetCore.SignalR.Protocols.Json.wasm": "sha256-QxtIbKuarCP/L1F7SAdqSrsUIVZFd+YyCj7mPSsZiz8=",
       "Microsoft.Extensions.Configuration.wasm": "sha256-UDGEQR7J3WTfzYMgOzxVIBwFQtKEeJvO8UgrWagypdE=",
       "Microsoft.Extensions.Configuration.Abstractions.wasm": "sha256-yNdqbqDWGiJo943D7LPak5xryCBEsNH0wtdiuU1R9VE=",
       "Microsoft.Extensions.Configuration.Binder.wasm": "sha256-fNNlyyW44y8Gp6dvOtsvHoVNzpT8lrKmPleg5CDhRAo=",
@@ -30,6 +38,7 @@
       "Microsoft.Extensions.Configuration.Json.wasm": "sha256-CtLsl9w5UTJXGXTbp+SQxMzt9f/gjQ4EkywrtuCscvU=",
       "Microsoft.Extensions.DependencyInjection.wasm": "sha256-CS+QrPLaogl32aUg+ES1Ef5QGKoMyjt3V+wGoiG+tpw=",
       "Microsoft.Extensions.DependencyInjection.Abstractions.wasm": "sha256-NICKEw2hjoBhl1lvxOBh8cxOIN8kkrGHz3pvV1eLLbY=",
+      "Microsoft.Extensions.Features.wasm": "sha256-i3ZBD29OKj1zyP7AG3Lcd/6aA/tqVQCyabICFidgxWs=",
       "Microsoft.Extensions.FileProviders.Abstractions.wasm": "sha256-IUopixuV8E09mP+TIgRp/lXEbeacXbUTW7cu0v5B9Tc=",
       "Microsoft.Extensions.FileProviders.Physical.wasm": "sha256-MS+zB0xkKhKk/QdE32ZwKtdlrLMLI/y2NAKPUWhcBVg=",
       "Microsoft.Extensions.FileSystemGlobbing.wasm": "sha256-AnWUKd0qJ8ZNKkRC0AFK2cjjszB7reXiP+bXdIi8bic=",
@@ -208,12 +217,12 @@
       "mscorlib.wasm": "sha256-pP80UGziulDYhvVdeUaGEq9FlrHQDQmnCqVvx1FJZis=",
       "netstandard.wasm": "sha256-ARMsMyhWuSDjvzisfZbnEptnxh8Vh7VpHPhuT6iazy0=",
       "System.Private.CoreLib.wasm": "sha256-+28m4yuZsdz9ij1sJHvNH896fSI8gXgrQ9bhGO76Qqo=",
-      "Nebula.Shared.wasm": "sha256-DH6jDzTWntvgIPNcXSP91mDZ20ogY4sUnzZ3XtsgSWs=",
-      "Nebula.Client.wasm": "sha256-NRpZBF1kQ10z+AO9pzNrLja6CtDn4uvuvg0hWCP8aZA="
+      "Nebula.Shared.wasm": "sha256-/I1lOtAkdu4IIdJvqDPWhfx/SCjI2N2uCDv158xACRY=",
+      "Nebula.Client.wasm": "sha256-isjG6Uh0aFL/2V59+YXTV92q3oGft2j1kFGzs8bSNMI="
     },
     "pdb": {
-      "Nebula.Shared.pdb": "sha256-dF9n9K/QmuVSTPCulQbse+Gws5jYC9cKIkIB2uPKPa0=",
-      "Nebula.Client.pdb": "sha256-ISoARMaFQu5+ucIOrM4M6Ix4vvShqyWW+OF+b1/qZz8="
+      "Nebula.Shared.pdb": "sha256-h0K1jcT4xknnXgvG4VwFrOeFzua+QN4FvzI/54PCGDU=",
+      "Nebula.Client.pdb": "sha256-eNUHsfbxMK7hzFPsOW/GAzKVQwBveG3wFS10ZIiEJCI="
     }
   },
   "cacheBootResources": true,
