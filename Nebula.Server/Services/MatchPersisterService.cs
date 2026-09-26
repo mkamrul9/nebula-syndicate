@@ -39,6 +39,38 @@ namespace Nebula.Server.Services
 
                 var winnerId = state.Players.OrderByDescending(p => p.Value.Credits).First().Key;
 
+                // 1. Identify the currently active season
+                var activeSeason = await db.Set<Season>()
+                    .FirstOrDefaultAsync(s => s.StartDateUTC <= DateTime.UtcNow && s.EndDateUTC >= DateTime.UtcNow, stoppingToken);
+
+                if (activeSeason != null)
+                {
+                    // Base XP is tied to match length (e.g., 10 XP per minute) to discourage early quitting
+                    var matchMinutes = state.CurrentTick / 10 / 60;
+                    var baseXP = Math.Max(10, matchMinutes * 10); 
+
+                    foreach (var playerEntry in state.Players)
+                    {
+                        var playerId = Guid.Parse(playerEntry.Key);
+                        var isWinner = playerId.ToString() == winnerId;
+                        
+                        // Winners get a 50% XP bonus
+                        var xpEarned = isWinner ? (int)(baseXP * 1.5) : baseXP;
+
+                        // Upsert the player's season progress record
+                        var progress = await db.Set<PlayerSeasonProgress>()
+                            .FirstOrDefaultAsync(p => p.PlayerId == playerId && p.SeasonId == activeSeason.Id, stoppingToken);
+
+                        if (progress == null)
+                        {
+                            progress = new PlayerSeasonProgress { PlayerId = playerId, SeasonId = activeSeason.Id, TotalXP = 0 };
+                            db.Add(progress);
+                        }
+
+                        progress.TotalXP += xpEarned;
+                    }
+                }
+
                 var record = new MatchRecord
                 {
                     Id = Guid.Parse(state.MatchId),
@@ -118,6 +150,52 @@ namespace Nebula.Server.Services
                 var winnerUsername = state.Players[winnerId].PlayerName; 
                 await redisDb.SortedSetIncrementAsync("leaderboard:wins", winnerUsername, 1);
                 
+                // Check if this was a tournament match (MatchId matches a TournamentMatch.Id)
+                if (Guid.TryParse(state.MatchId, out var parsedMatchId))
+                {
+                    var tournamentMatch = await db.Set<TournamentMatch>()
+                        .Include(m => m.Tournament)
+                        .FirstOrDefaultAsync(m => m.Id == parsedMatchId, stoppingToken);
+
+                    if (tournamentMatch != null && tournamentMatch.State == MatchState.InProgress)
+                    {
+                        tournamentMatch.WinnerId = Guid.Parse(winnerId);
+                        tournamentMatch.State = MatchState.Finished;
+
+                        // Advance the winner to the next round in the bracket
+                        if (tournamentMatch.NextMatchId.HasValue)
+                        {
+                            var nextMatch = await db.Set<TournamentMatch>().FindAsync(new object[] { tournamentMatch.NextMatchId }, cancellationToken: stoppingToken);
+                            
+                            if (nextMatch != null)
+                            {
+                                // We don't know if they are Team A or Team B in the next match yet
+                                if (nextMatch.TeamAId == null)
+                                {
+                                    nextMatch.TeamAId = tournamentMatch.WinnerId;
+                                }
+                                else
+                                {
+                                    nextMatch.TeamBId = tournamentMatch.WinnerId;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // No next match? This was the Grand Final!
+                            if (tournamentMatch.Tournament != null)
+                            {
+                                tournamentMatch.Tournament.State = TournamentState.Completed;
+                            }
+                            
+                            // Distribute the massive prize pool here...
+                            Console.WriteLine($"[TOURNAMENT] Team {winnerId} has won the tournament!");
+                        }
+                    }
+                    
+                    await db.SaveChangesAsync(stoppingToken);
+                }
+
                 Console.WriteLine($"[DB] Match {state.MatchId} saved to PostgreSQL and Redis.");
             }
         }

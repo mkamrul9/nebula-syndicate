@@ -115,6 +115,7 @@ builder.Services.AddSingleton<PlayerConnectionTracker>();
 // Add the Background Service as a Singleton so the Hub can inject it
 builder.Services.AddSingleton<MatchmakingService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<MatchmakingService>());
+builder.Services.AddHostedService<TournamentOrchestrator>();
 
 // Add the Match Persister Service
 builder.Services.AddSingleton<MatchPersisterService>();
@@ -545,6 +546,82 @@ paymentsApi.MapPost("/webhook", async (HttpRequest request, IConfiguration confi
     {
         Console.WriteLine($"[Stripe Webhook Error] {e.Message}");
         return Results.BadRequest();
+    }
+});
+
+var seasonApi = app.MapGroup("/api/season").RequireAuthorization();
+seasonApi.MapPost("/claim/{tierId}", async (int tierId, bool claimPremium, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    // 1. Transaction to prevent double-claiming
+    using var tx = await db.Database.BeginTransactionAsync();
+
+    try
+    {
+        var tier = await db.Set<SeasonTier>().FindAsync(tierId);
+        if (tier == null) return Results.NotFound();
+
+        var progress = await db.Set<PlayerSeasonProgress>()
+            .FirstOrDefaultAsync(p => p.PlayerId == userId && p.SeasonId == tier.SeasonId);
+
+        // 2. Validate XP and Premium Status
+        if (progress == null || progress.TotalXP < tier.RequiredXP) 
+            return Results.BadRequest("You have not unlocked this tier yet.");
+
+        if (claimPremium && !progress.HasPremiumPass) 
+            return Results.BadRequest("You do not own the Premium Syndicate Pass.");
+
+        var claimRecord = await db.Set<PlayerClaimedReward>()
+            .FirstOrDefaultAsync(c => c.PlayerId == userId && c.SeasonTierId == tierId);
+
+        if (claimRecord == null)
+        {
+            claimRecord = new PlayerClaimedReward { PlayerId = userId, SeasonTierId = tierId };
+            db.Add(claimRecord);
+        }
+
+        // 3. Issue the Reward and mark as claimed
+        if (claimPremium && !claimRecord.ClaimedPremium)
+        {
+            claimRecord.ClaimedPremium = true;
+            // logic to issue tier.PremiumCosmeticId and tier.PremiumCurrencyReward via your services
+            if (tier.PremiumCosmeticId.HasValue)
+            {
+                var pc = new PlayerCosmetic { PlayerId = userId, CosmeticItemId = tier.PremiumCosmeticId.Value };
+                if (!await db.Set<PlayerCosmetic>().AnyAsync(x => x.PlayerId == userId && x.CosmeticItemId == tier.PremiumCosmeticId.Value))
+                    db.Set<PlayerCosmetic>().Add(pc);
+            }
+            if (tier.PremiumCurrencyReward > 0)
+            {
+                await premiumService.AdjustBalanceAsync(userId, tier.PremiumCurrencyReward, TransactionType.QuestReward, $"SeasonPremium_{tierId}");
+            }
+        }
+        else if (!claimPremium && !claimRecord.ClaimedFree)
+        {
+            claimRecord.ClaimedFree = true;
+            // logic to issue tier.FreeCosmeticId via inventory service
+            if (tier.FreeCosmeticId.HasValue)
+            {
+                var pc = new PlayerCosmetic { PlayerId = userId, CosmeticItemId = tier.FreeCosmeticId.Value };
+                if (!await db.Set<PlayerCosmetic>().AnyAsync(x => x.PlayerId == userId && x.CosmeticItemId == tier.FreeCosmeticId.Value))
+                    db.Set<PlayerCosmetic>().Add(pc);
+            }
+        }
+        else
+        {
+            return Results.BadRequest("Reward already claimed.");
+        }
+
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Results.Ok();
+    }
+    catch
+    {
+        await tx.RollbackAsync();
+        return Results.StatusCode(500);
     }
 });
 

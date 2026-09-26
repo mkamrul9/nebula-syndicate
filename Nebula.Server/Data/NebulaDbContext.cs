@@ -15,6 +15,12 @@ namespace Nebula.Server.Data
         public DbSet<PremiumLedgerEntry> PremiumLedgerEntries { get; set; }
         public DbSet<CosmeticItem> CosmeticItems { get; set; }
         public DbSet<PlayerCosmetic> PlayerCosmetics { get; set; }
+        public DbSet<Season> Seasons { get; set; }
+        public DbSet<SeasonTier> SeasonTiers { get; set; }
+        public DbSet<PlayerSeasonProgress> PlayerSeasonProgress { get; set; }
+        public DbSet<PlayerClaimedReward> PlayerClaimedRewards { get; set; }
+        public DbSet<Tournament> Tournaments { get; set; }
+        public DbSet<TournamentMatch> TournamentMatches { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +51,19 @@ namespace Nebula.Server.Data
                 new CosmeticItem { Id = 1, Name = "Neon Crimson", Description = "A red neon glowing drone skin.", Type = CosmeticType.DroneSkin, PriceInCoins = 500, AssetRef = "drone-neon-crimson" },
                 new CosmeticItem { Id = 2, Name = "Gold Elite", Description = "Premium gold plated avatar.", Type = CosmeticType.Avatar, PriceInCoins = 1000, AssetRef = "avatar-gold-elite" }
             );
+
+            // Configure Season entities
+            modelBuilder.Entity<PlayerSeasonProgress>()
+                .HasKey(p => new { p.PlayerId, p.SeasonId });
+
+            modelBuilder.Entity<PlayerClaimedReward>()
+                .HasKey(c => new { c.PlayerId, c.SeasonTierId });
+
+            // Configure Tournament entities
+            modelBuilder.Entity<TournamentMatch>()
+                .HasOne(m => m.Tournament)
+                .WithMany(t => t.Matches)
+                .HasForeignKey(m => m.TournamentId);
         }
     }
 }
