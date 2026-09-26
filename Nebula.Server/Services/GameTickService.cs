@@ -54,24 +54,38 @@ namespace Nebula.Server.Services
                     // Drain the queue of all actions that came in during the last 100ms
                     while (state.PendingActions.TryDequeue(out var action))
                     {
+                        // ANTI-CHEAT 1: Does the player actually exist in this match?
                         if (!state.Players.TryGetValue(action.PlayerId, out var player)) continue;
+
+                        // ANTI-CHEAT 2: Is the match actually in progress? (Prevent post-game actions)
+                        if (state.Status != GameStatus.InProgress) continue;
+
+                        // ANTI-CHEAT 3: Is the player currently muted by an EMP? 
+                        // (A hacked client might bypass the disabled UI button)
+                        if (player.IsEmpMuted) continue;
 
                         if (action.Type == ActionType.DeployDrone)
                         {
                             const decimal DroneCost = 500.0m; // Hardcoded for now
 
-                            // Check exact balance at the moment of execution
+                            // ANTI-CHEAT 4: Strict balance validation
                             if (player.Credits >= DroneCost)
                             {
-                                player.Credits -= DroneCost;
-
+                                // ANTI-CHEAT 5: Validate the target parameter is an expected value
                                 if (action.TargetResource == "Ironium")
                                 {
+                                    player.Credits -= DroneCost;
                                     player.ActiveIroniumDrones++;
                                 }
                                 else if (action.TargetResource == "Plasma")
                                 {
+                                    player.Credits -= DroneCost;
                                     player.ActivePlasmaDrones++;
+                                }
+                                else
+                                {
+                                    // Unrecognized resource string. Hacker might be fuzzing the API.
+                                    Console.WriteLine($"[Anti-Cheat] Invalid resource target from {action.PlayerId}.");
                                 }
                             }
                         }
@@ -93,6 +107,9 @@ namespace Nebula.Server.Services
                         else if (action.Type == ActionType.UseSabotage && action.Sabotage == SabotageType.EMP)
                         {
                             const decimal EmpCost = 2000.0m;
+                            
+                            // ANTI-CHEAT 6: Self-targeting check and Target Existence check
+                            if (action.TargetPlayerId == action.PlayerId) continue; 
                             
                             // Ensure the target actually exists in this match
                             if (state.Players.TryGetValue(action.TargetPlayerId, out var victim))

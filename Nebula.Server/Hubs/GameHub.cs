@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Nebula.Shared.Interfaces;
 using Nebula.Shared.Models;
 using Nebula.Server.Services;
+using System.Collections.Concurrent;
 using Nebula.Server.Models;
 
 namespace Nebula.Server.Hubs
@@ -16,6 +17,9 @@ namespace Nebula.Server.Hubs
         private readonly GameStateManager _gameStateManager;
 
         private const string GlobalChannel = "Global";
+
+        // Tracks the last action time for rate limiting (ConnectionId -> Timestamp)
+        private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
 
         public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager)
         {
@@ -64,6 +68,7 @@ namespace Nebula.Server.Hubs
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
+            _lastActionTimes.TryRemove(Context.ConnectionId, out _);
             var playerId = _tracker.RemoveConnection(Context.ConnectionId);
             
             if (playerId != null)
@@ -136,9 +141,28 @@ namespace Nebula.Server.Hubs
             await Clients.Caller.ReceiveSystemMessage("Entered matchmaking queue. Searching for rivals...");
         }
 
+        // Helper method to check rate limit
+        private bool IsRateLimited()
+        {
+            var now = DateTime.UtcNow;
+            if (_lastActionTimes.TryGetValue(Context.ConnectionId, out var lastAction))
+            {
+                // Only allow 1 action every 100 milliseconds (10 per second max)
+                if ((now - lastAction).TotalMilliseconds < 100)
+                {
+                    Console.WriteLine($"[Anti-Cheat] Player {Context.UserIdentifier} rate-limited.");
+                    return true; 
+                }
+            }
+            _lastActionTimes[Context.ConnectionId] = now;
+            return false;
+        }
+
         // Client calls this to take an action in-game
         public async Task DispatchDrone(string targetNodeId)
         {
+            if (IsRateLimited()) return;
+
             var playerId = Context.UserIdentifier;
             if (string.IsNullOrEmpty(playerId)) return;
 
@@ -159,6 +183,8 @@ namespace Nebula.Server.Hubs
 
         public async Task LaunchSabotage(string targetPlayerId, SabotageType type)
         {
+            if (IsRateLimited()) return;
+
             var playerId = Context.UserIdentifier;
             if (string.IsNullOrEmpty(playerId)) return;
 
@@ -179,6 +205,8 @@ namespace Nebula.Server.Hubs
 
         public async Task BuildDefense(DefenseType type)
         {
+            if (IsRateLimited()) return;
+
             var playerId = Context.UserIdentifier;
             if (string.IsNullOrEmpty(playerId)) return;
 
