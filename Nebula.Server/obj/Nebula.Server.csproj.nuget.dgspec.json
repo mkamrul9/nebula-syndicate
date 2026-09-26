@@ -134,6 +134,18 @@
               "target": "Package",
               "version": "[8.0.*, )"
             },
+            "OpenTelemetry.Exporter.Prometheus.AspNetCore": {
+              "target": "Package",
+              "version": "[1.19.1-beta.1, )"
+            },
+            "OpenTelemetry.Extensions.Hosting": {
+              "target": "Package",
+              "version": "[1.19.1, )"
+            },
+            "OpenTelemetry.Instrumentation.AspNetCore": {
+              "target": "Package",
+              "version": "[1.19.0, )"
+            },
             "StackExchange.Redis": {
               "target": "Package",
               "version": "[3.3.1, )"

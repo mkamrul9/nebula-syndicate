@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.SignalR;
 using Nebula.Server.Hubs;
 using Nebula.Shared.Interfaces;
 using Nebula.Shared.Models;
+using System.Diagnostics.Metrics;
+using System.Diagnostics;
 
 namespace Nebula.Server.Services
 {
@@ -14,24 +16,38 @@ namespace Nebula.Server.Services
         
         // 10 ticks per second (100ms per tick)
         private const int TickIntervalMilliseconds = 100; 
+        
+        // Define our metrics
+        private readonly Counter<long> _ticksProcessedCounter;
+        private readonly Histogram<double> _tickDurationHistogram;
 
         public GameTickService(
             GameStateManager gameStateManager, 
             IHubContext<GameHub, IGameClient> hubContext,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            IMeterFactory meterFactory)
         {
             _gameStateManager = gameStateManager;
             _hubContext = hubContext;
             _serviceProvider = serviceProvider;
+            
+            // Create a custom meter that matches the name we registered in Program.cs
+            var meter = meterFactory.Create("Nebula.GameServer");
+            
+            _ticksProcessedCounter = meter.CreateCounter<long>("nebula.server.ticks.total", description: "Total number of game ticks processed.");
+            _tickDurationHistogram = meter.CreateHistogram<double>("nebula.server.tick.duration", unit: "ms", description: "Time taken to process a single 10Hz tick.");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // Use a PeriodicTimer for more precise timing than Task.Delay
             using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(TickIntervalMilliseconds));
+            var stopwatch = new Stopwatch();
 
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
+                stopwatch.Restart();
+
                 var activeMatches = _gameStateManager.GetAllActiveMatches().ToList();
 
                 if (!activeMatches.Any()) continue;
@@ -271,6 +287,19 @@ namespace Nebula.Server.Services
                     await _hubContext.Clients.Group(state.MatchId)
                         .ReceiveGameStateTick(state);
                 });
+
+                stopwatch.Stop();
+                
+                // Record the metrics instantly in memory
+                _ticksProcessedCounter.Add(1);
+                _tickDurationHistogram.Record(stopwatch.Elapsed.TotalMilliseconds);
+
+                // Warning threshold: If a tick takes longer than 50ms, we are in danger 
+                // of missing the 100ms window, which causes rubber-banding.
+                if (stopwatch.ElapsedMilliseconds > 50)
+                {
+                    Console.WriteLine($"[WARN] Heavy Tick Detected: {stopwatch.ElapsedMilliseconds}ms");
+                }
             }
         }
     }

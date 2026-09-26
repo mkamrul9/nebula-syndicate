@@ -136,3 +136,9 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\MessagePack.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\MessagePack.Annotations.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.AspNetCore.SignalR.StackExchangeRedis.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.NET.StringTools.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Api.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Api.ProviderBuilderExtensions.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Exporter.Prometheus.AspNetCore.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Extensions.Hosting.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Instrumentation.AspNetCore.dll

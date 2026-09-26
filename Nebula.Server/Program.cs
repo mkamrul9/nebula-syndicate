@@ -11,6 +11,7 @@ using Nebula.Shared.Models;
 using StackExchange.Redis;
 using Stripe;
 using Stripe.Checkout;
+using OpenTelemetry.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+// Configure OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation() // Tracks standard HTTP endpoints
+               .AddMeter("Nebula.GameServer")  // Subscribe to our custom game metrics!
+               .AddPrometheusExporter();       // Expose data in Prometheus format
+    });
 
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -519,6 +529,9 @@ paymentsApi.MapPost("/webhook", async (HttpRequest request, IConfiguration confi
 
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
+
+// Map the scraping endpoint (Prometheus will hit this route)
+app.MapPrometheusScrapingEndpoint("/metrics"); 
 
 app.Run();
 
