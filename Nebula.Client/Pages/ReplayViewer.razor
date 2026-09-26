@@ -1,0 +1,154 @@
+@* File: Nebula.Client/Pages/ReplayViewer.razor *@
+@page "/replay/{MatchId}"
+@using Nebula.Shared.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="container-fluid bg-dark text-light min-vh-100 p-4">
+    <h2 class="text-warning mb-3">TACTICAL REPLAY: @MatchId</h2>
+
+    @if (_frames == null)
+    {
+        <div class="spinner-border text-info" role="status"></div>
+    }
+    else if (_frames.Count == 0)
+    {
+        <div class="alert alert-danger">Replay data corrupted or empty.</div>
+    }
+    else
+    {
+        var currentFrame = _frames[_currentFrameIndex];
+        
+        <!-- Playback Controls & Scrubber -->
+        <div class="card bg-secondary text-white mb-4 p-3">
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn @(_isPlaying ? "btn-danger" : "btn-success")" @onclick="TogglePlayback">
+                    @(_isPlaying ? "⏸ PAUSE" : "▶ PLAY")
+                </button>
+                
+                <span class="font-monospace">Time: @(currentFrame.Tick / 10)s</span>
+                
+                <input type="range" class="form-range flex-grow-1" 
+                       min="0" max="@(_frames.Count - 1)" 
+                       @bind="_currentFrameIndex" 
+                       @bind:event="oninput" />
+                       
+                <span class="font-monospace">End: @(_frames.Last().Tick / 10)s</span>
+            </div>
+        </div>
+
+        <!-- Replay Data Visualization -->
+        <div class="row">
+            <!-- Market Status -->
+            <div class="col-md-12 mb-4">
+                <div class="card bg-black border-info">
+                    <div class="card-header border-bottom border-info fw-bold">MARKET AT TICK @currentFrame.Tick</div>
+                    <div class="card-body d-flex justify-content-around">
+                        @if (currentFrame.Market.ContainsKey("Ironium"))
+                        {
+                            <h4 class="text-secondary">Ironium: ₡@currentFrame.Market["Ironium"].ToString("F2")</h4>
+                        }
+                        @if (currentFrame.Market.ContainsKey("Plasma"))
+                        {
+                            <h4 class="text-info">Plasma: ₡@currentFrame.Market["Plasma"].ToString("F2")</h4>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player States -->
+            @foreach (var p in currentFrame.PlayerStats)
+            {
+                var stats = p.Value;
+                // Rehydrate the double[] array into readable variables
+                var credits = stats[0];
+                var ironium = stats[1];
+                var plasma = stats[2];
+                var feDrones = stats[3];
+                var plDrones = stats[4];
+                var empExpiration = stats[5];
+                var isMuted = currentFrame.Tick < empExpiration;
+
+                <div class="col-md-6">
+                    <div class="card @(isMuted ? "bg-danger" : "bg-dark") border-secondary text-white mb-3">
+                        <div class="card-header fw-bold">Player: @p.Key[..8]...</div>
+                        <div class="card-body">
+                            <h3 class="text-warning">₡ @Math.Floor(credits)</h3>
+                            <hr />
+                            <p>Ironium: @Math.Floor(ironium) <span class="badge bg-secondary">@feDrones Drones</span></p>
+                            <p>Plasma: @Math.Floor(plasma) <span class="badge bg-info">@plDrones Drones</span></p>
+                            @if(isMuted)
+                            {
+                                <div class="alert alert-dark text-danger fw-bold py-1">EMP DISABLED</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string MatchId { get; set; } = string.Empty;
+
+    private List<ReplayFrame>? _frames;
+    private int _currentFrameIndex = 0;
+    private bool _isPlaying = false;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _frames = await Http.GetFromJsonAsync<List<ReplayFrame>>($"api/replay/{MatchId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load replay: {ex.Message}");
+            _frames = new List<ReplayFrame>();
+        }
+    }
+
+    private void TogglePlayback()
+    {
+        _isPlaying = !_isPlaying;
+
+        if (_isPlaying)
+        {
+            _cts = new CancellationTokenSource();
+            _ = PlayLoop(_cts.Token);
+        }
+        else
+        {
+            _cts?.Cancel();
+        }
+    }
+
+    private async Task PlayLoop(CancellationToken token)
+    {
+        // 1 second per frame (since we recorded at 1Hz in Phase 25)
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        
+        while (await timer.WaitForNextTickAsync(token) && !token.IsCancellationRequested)
+        {
+            if (_frames == null || _currentFrameIndex >= _frames.Count - 1)
+            {
+                _isPlaying = false;
+                StateHasChanged();
+                break;
+            }
+
+            _currentFrameIndex++;
+            StateHasChanged(); // Tell Blazor to re-render the new frame
+        }
+    }
+
+    // Clean up the background loop if the user navigates away
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}

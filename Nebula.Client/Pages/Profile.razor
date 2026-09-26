@@ -48,6 +48,7 @@
                                     <th>Result</th>
                                     <th>Duration</th>
                                     <th>Date</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -66,6 +67,11 @@
                                         </td>
                                         <td>@(match.DurationSeconds / 60)m @(match.DurationSeconds % 60)s</td>
                                         <td>@match.EndedAt.ToLocalTime().ToString("MMM dd, HH:mm")</td>
+                                        <td>
+                                            <a class="btn btn-sm btn-outline-info" href="/replay/@match.MatchId">
+                                                Watch Replay
+                                            </a>
+                                        </td>
                                     </tr>
                                 }
                             </tbody>

@@ -194,6 +194,19 @@ app.MapGet("/api/leaderboard", async (IConnectionMultiplexer redis) =>
     return Results.Ok(result);
 });
 
+app.MapGet("/api/replay/{matchId}", async (Guid matchId, NebulaDbContext db) =>
+{
+    var match = await db.MatchRecords
+        .AsNoTracking()
+        .FirstOrDefaultAsync(m => m.Id == matchId);
+
+    if (match == null || string.IsNullOrEmpty(match.ReplayDataJson)) 
+        return Results.NotFound();
+
+    // Return the raw JSON string directly; minimal overhead
+    return Results.Content(match.ReplayDataJson, "application/json");
+});
+
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
