@@ -1,0 +1,139 @@
+@* File: Nebula.Client/Pages/Arena.razor *@
+@page "/arena/{MatchId}"
+@using Nebula.Client.Services
+@using Nebula.Shared.Models
+@implements IDisposable
+@inject GameConnectionManager GameManager
+
+@if (_latestState == null)
+{
+    <div class="text-center mt-5">
+        <div class="spinner-border text-info" role="status"></div>
+        <h3 class="mt-3">Synchronizing telemetry with Arena...</h3>
+    </div>
+}
+else
+{
+    <div class="container-fluid bg-dark text-light min-vh-100 p-4">
+        <div class="row">
+            <!-- Left Column: Player Resources -->
+            <div class="col-md-3">
+                <div class="card bg-secondary text-white mb-3">
+                    <div class="card-header border-bottom border-info fw-bold">
+                        MY SYNDICATE
+                    </div>
+                    <div class="card-body">
+                        @if (_myState != null)
+                        {
+                            <h2 class="text-warning">₡ @Math.Floor(_myState.Credits)</h2>
+                            <hr />
+                            <h5>Ironium: @Math.Floor(_myState.Ironium)</h5>
+                            <p class="text-muted small">Drones Active: @_myState.ActiveIroniumDrones</p>
+                            
+                            <h5>Plasma: @Math.Floor(_myState.Plasma)</h5>
+                            <p class="text-muted small">Drones Active: @_myState.ActivePlasmaDrones</p>
+                            
+                            @if (_myState.IsEmpMuted)
+                            {
+                                <div class="alert alert-danger blink-text">SYSTEMS DISABLED (EMP)</div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Column: The Live Market -->
+            <div class="col-md-6">
+                <div class="card bg-dark border-primary">
+                    <div class="card-header border-bottom border-primary text-center fw-bold">
+                        GLOBAL MARKET (Tick: @_latestState.CurrentTick)
+                    </div>
+                    <div class="card-body d-flex justify-content-around text-center">
+                        @if (_latestState.MarketPrices.ContainsKey("Ironium"))
+                        {
+                            <div>
+                                <h4 class="text-info">Ironium</h4>
+                                <h2>₡ @_latestState.MarketPrices["Ironium"].ToString("F2")</h2>
+                            </div>
+                        }
+                        @if (_latestState.MarketPrices.ContainsKey("Plasma"))
+                        {
+                            <div>
+                                <h4 class="text-danger">Plasma</h4>
+                                <h2>₡ @_latestState.MarketPrices["Plasma"].ToString("F2")</h2>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Opponent Intel -->
+            <div class="col-md-3">
+                <div class="card bg-danger text-white">
+                    <div class="card-header border-bottom border-dark fw-bold">
+                        RIVAL INTEL
+                    </div>
+                    <div class="card-body">
+                        @foreach (var opp in _opponents)
+                        {
+                            <div class="mb-3 border-bottom pb-2">
+                                <h6>@opp.PlayerName 
+                                    @if(!opp.IsConnected) { <span class="badge bg-warning">OFFLINE</span> }
+                                </h6>
+                                <!-- We only show their active drones, resources are hidden fog-of-war! -->
+                                <div>Ironium Drones: @opp.ActiveIroniumDrones</div>
+                                <div>Plasma Drones: @opp.ActivePlasmaDrones</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string MatchId { get; set; } = string.Empty;
+
+    private GameState? _latestState;
+    private PlayerState? _myState;
+    private List<PlayerState> _opponents = new();
+    
+    private string _myPlayerId = string.Empty;
+    private DateTime _lastRender = DateTime.MinValue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _myPlayerId = await GameManager.GetCurrentPlayerIdAsync();
+        
+        GameManager.OnGameStateUpdated += HandleGameState;
+    }
+
+    private void HandleGameState(GameState state)
+    {
+        // 1. Validate this tick is for our current match
+        if (state.MatchId != MatchId) return;
+
+        _latestState = state;
+        
+        // 2. Separate "Me" from "Opponents"
+        if (state.Players.TryGetValue(_myPlayerId, out var mine))
+        {
+            _myState = mine;
+        }
+        _opponents = state.Players.Where(p => p.Key != _myPlayerId).Select(p => p.Value).ToList();
+
+        // 3. UI Render Throttling (Render max 5 times a second to save CPU)
+        if ((DateTime.UtcNow - _lastRender).TotalMilliseconds > 200)
+        {
+            _lastRender = DateTime.UtcNow;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        GameManager.OnGameStateUpdated -= HandleGameState;
+    }
+}

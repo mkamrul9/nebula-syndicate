@@ -65,7 +65,7 @@
         // The server found a match! Route the user to the game arena.
         // We use InvokeAsync because SignalR events fire on a background thread,
         // but NavigationManager must be called on the UI thread.
-        InvokeAsync(() => NavManager.NavigateTo($"/dashboard"));
+        InvokeAsync(() => NavManager.NavigateTo($"/arena/{matchId}"));
     }
 
     public void Dispose()

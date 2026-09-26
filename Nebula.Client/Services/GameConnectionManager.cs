@@ -81,6 +81,30 @@ namespace Nebula.Client.Services
             }
         }
 
+        public async Task<string> GetCurrentPlayerIdAsync()
+        {
+            var token = await _localStorage.GetItemAsync<string>("authToken");
+            if (string.IsNullOrEmpty(token)) return string.Empty;
+
+            // Decode JWT payload (without validation, as server handles real security)
+            var payload = token.Split('.')[1];
+            var jsonBytes = ParseBase64WithoutPadding(payload);
+            var keyValuePairs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
+            
+            // "sub" is the standard JWT claim for Subject/UserId
+            return keyValuePairs?["sub"]?.ToString() ?? string.Empty;
+        }
+
+        private byte[] ParseBase64WithoutPadding(string base64)
+        {
+            switch (base64.Length % 4)
+            {
+                case 2: base64 += "=="; break;
+                case 3: base64 += "="; break;
+            }
+            return Convert.FromBase64String(base64);
+        }
+
         public async ValueTask DisposeAsync()
         {
             if (_hubConnection is not null)
