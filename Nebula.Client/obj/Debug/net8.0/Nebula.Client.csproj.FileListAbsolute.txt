@@ -1084,3 +1084,7 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\79patf7sr
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\a7q839ag6z.gz
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\compressed\nz73h8lyj1.gz
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\Nebula.Client.sourcelink.json
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\bin\Debug\net8.0\wwwroot\service-worker-assets.js
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\bin\Debug\net8.0\wwwroot\service-worker.js
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\service-worker\service-worker.js
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Client\obj\Debug\net8.0\service-worker-assets.js.build
