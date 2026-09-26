@@ -1,0 +1,103 @@
+@* File: Nebula.Client/Pages/Profile.razor *@
+@page "/profile"
+@using Nebula.Shared.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<div class="container mt-4 text-light">
+    <h2 class="text-warning mb-4">Commander Profile</h2>
+
+    @if (_stats == null)
+    {
+        <div class="spinner-border text-primary" role="status"></div>
+    }
+    else
+    {
+        <div class="row">
+            <!-- Stats Card -->
+            <div class="col-md-4">
+                <div class="card bg-dark border-info text-white">
+                    <div class="card-body text-center">
+                        <h4 class="card-title text-info">@_stats.Username</h4>
+                        <hr class="border-secondary"/>
+                        <div class="display-6">@_stats.WinRate%</div>
+                        <div class="text-muted small mb-3">WIN RATE</div>
+                        
+                        <div class="d-flex justify-content-between px-3">
+                            <div>
+                                <h5 class="mb-0">@_stats.TotalMatchesPlayed</h5>
+                                <small class="text-muted">MATCHES</small>
+                            </div>
+                            <div>
+                                <h5 class="text-success mb-0">@_stats.TotalWins</h5>
+                                <small class="text-muted">WINS</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History Table -->
+            <div class="col-md-8">
+                <div class="card bg-dark border-secondary text-white">
+                    <div class="card-header fw-bold">Recent Operations</div>
+                    <div class="card-body p-0">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Result</th>
+                                    <th>Duration</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var match in _history)
+                                {
+                                    <tr>
+                                        <td>
+                                            @if (match.IsVictory)
+                                            {
+                                                <span class="badge bg-success">VICTORY</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">DEFEAT</span>
+                                            }
+                                        </td>
+                                        <td>@(match.DurationSeconds / 60)m @(match.DurationSeconds % 60)s</td>
+                                        <td>@match.EndedAt.ToLocalTime().ToString("MMM dd, HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private PlayerStatsDto? _stats;
+    private List<MatchHistoryItemDto> _history = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Requires the HttpClient in Program.cs to be configured with a DelegatingHandler 
+        // that automatically attaches the JWT bearer token from LocalStorage to outbound requests.
+        try
+        {
+            _stats = await Http.GetFromJsonAsync<PlayerStatsDto>("api/profile/stats");
+            
+            var historyData = await Http.GetFromJsonAsync<List<MatchHistoryItemDto>>("api/profile/history?page=1&pageSize=10");
+            if (historyData != null)
+            {
+                _history = historyData;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching profile data: {ex.Message}");
+        }
+    }
+}

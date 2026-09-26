@@ -40,6 +40,7 @@ namespace Nebula.Server.Services
                     WinnerId = Guid.Parse(winnerId),
                     DurationInSeconds = state.CurrentTick / 10, // Assuming 10 ticks/sec
                     EndedAt = DateTime.UtcNow,
+                    ParticipantIds = state.Players.Keys.Select(Guid.Parse).ToList(),
                     FinalStateJson = System.Text.Json.JsonSerializer.Serialize(state)
                 };
 

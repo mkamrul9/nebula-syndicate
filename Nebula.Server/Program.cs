@@ -123,32 +123,57 @@ app.MapPost("/api/auth/login", async (LoginDto request, NebulaDbContext db, ICon
     return Results.Ok(new { Token = new JwtSecurityTokenHandler().WriteToken(token) });
 });
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+var api = app.MapGroup("/api/profile").RequireAuthorization();
 
-app.MapGet("/weatherforecast", () =>
+api.MapGet("/stats", async (ClaimsPrincipal user, NebulaDbContext db) =>
 {
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
+    // Extract the UserId from the JWT token claims
+    var userIdString = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (userIdString == null) return Results.Unauthorized();
+    
+    var userId = Guid.Parse(userIdString);
+    
+    var profile = await db.Players
+        .AsNoTracking() // Performance boost for read-only queries
+        .FirstOrDefaultAsync(p => p.Id == userId);
+        
+    if (profile == null) return Results.NotFound();
+
+    return Results.Ok(new PlayerStatsDto
+    {
+        Username = profile.Username,
+        TotalMatchesPlayed = profile.TotalMatchesPlayed,
+        TotalWins = profile.TotalWins,
+        PremiumCredits = profile.PremiumCredits
+    });
+});
+
+api.MapGet("/history", async (ClaimsPrincipal user, NebulaDbContext db, int page = 1, int pageSize = 10) =>
+{
+    var userIdString = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (userIdString == null) return Results.Unauthorized();
+    
+    var userId = Guid.Parse(userIdString);
+    
+    var history = await db.MatchRecords
+        .AsNoTracking()
+        .Where(m => m.ParticipantIds.Contains(userId)) 
+        .OrderByDescending(m => m.EndedAt)
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(m => new MatchHistoryItemDto
+        {
+            MatchId = m.Id.ToString(),
+            IsVictory = m.WinnerId == userId,
+            DurationSeconds = m.DurationInSeconds,
+            EndedAt = m.EndedAt
+        })
+        .ToListAsync();
+
+    return Results.Ok(history);
+});
 
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

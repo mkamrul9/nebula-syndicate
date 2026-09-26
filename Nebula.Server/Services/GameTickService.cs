@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.SignalR;
 using Nebula.Server.Hubs;
 using Nebula.Shared.Interfaces;
+using Nebula.Shared.Models;
 
 namespace Nebula.Server.Services
 {

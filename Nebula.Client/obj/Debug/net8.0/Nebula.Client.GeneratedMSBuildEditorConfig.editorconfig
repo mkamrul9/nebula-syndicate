@@ -26,6 +26,14 @@ build_property._RazorSourceGeneratorDebug =
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Components/GlobalChatWidget.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50c1xHbG9iYWxDaGF0V2lkZ2V0LnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Arena.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQXJlbmEucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ291bnRlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -36,6 +44,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Lobby.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTG9iYnkucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Profile.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUHJvZmlsZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Weather.razor]
