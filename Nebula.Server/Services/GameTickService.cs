@@ -177,9 +177,10 @@ namespace Nebula.Server.Services
                         var random = new Random(); // Note: Use thread-local Random in production
 
                         // Process each resource market
-                        foreach (var resource in state.MarketPrices.Keys.ToList())
+                        foreach (var marketEntry in state.MarketPrices)
                         {
-                            var currentPrice = state.MarketPrices[resource];
+                            var resource = marketEntry.Key;
+                            var currentPrice = marketEntry.Value;
                             var basePrice = state.BasePrices[resource];
                             var currentPressure = state.MarketPressures[resource];
 

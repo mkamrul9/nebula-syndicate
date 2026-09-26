@@ -4,6 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Enable Server GC for multi-core high-throughput workloads -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <!-- Background GC prevents blocking the main execution threads -->
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

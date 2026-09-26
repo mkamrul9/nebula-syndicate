@@ -20,19 +20,19 @@ namespace Nebula.Shared.Models
         Firewall
     }
 
-    public class PlayerAction
+    public readonly struct PlayerAction
     {
-        public string PlayerId { get; set; } = string.Empty;
-        public ActionType Type { get; set; }
+        public string PlayerId { get; init; }
+        public ActionType Type { get; init; }
         
         // For Drone/Market actions
-        public string TargetResource { get; set; } = string.Empty; 
+        public string TargetResource { get; init; }
         
         // For Sabotage actions
-        public string TargetPlayerId { get; set; } = string.Empty; 
-        public SabotageType? Sabotage { get; set; }
+        public string TargetPlayerId { get; init; }
+        public SabotageType? Sabotage { get; init; }
 
         // For Defense actions
-        public DefenseType? Defense { get; set; }
+        public DefenseType? Defense { get; init; }
     }
 }
