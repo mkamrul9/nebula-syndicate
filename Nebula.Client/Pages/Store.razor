@@ -1,0 +1,38 @@
+@page "/store"
+@inject HttpClient Http
+@inject NavigationManager NavManager
+@using System.Net.Http.Json
+
+<div class="container text-center text-light mt-5">
+    <h2 class="text-warning mb-4">SYNDICATE EXCHANGE</h2>
+    
+    <div class="card bg-dark border-warning mx-auto p-4" style="max-width: 400px;">
+        <h3>1,000 Syndicate Coins</h3>
+        <p class="lead text-success fw-bold">$5.00 USD</p>
+        <button class="btn btn-warning btn-lg w-100 fw-bold" @onclick="BuyCredits" disabled="@_isProcessing">
+            @if (_isProcessing) { <span class="spinner-border spinner-border-sm"></span> }
+            else { <span>PURCHASE WITH STRIPE</span> }
+        </button>
+    </div>
+</div>
+
+@code {
+    private bool _isProcessing = false;
+
+    private async Task BuyCredits()
+    {
+        _isProcessing = true;
+        
+        var response = await Http.PostAsync("api/payments/checkout", null);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<CheckoutResponse>();
+            // Redirect the browser entirely to the Stripe hosted page
+            NavManager.NavigateTo(result!.Url); 
+        }
+        
+        _isProcessing = false;
+    }
+
+    public class CheckoutResponse { public string Url { get; set; } = string.Empty; }
+}

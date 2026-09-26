@@ -9,6 +9,8 @@ using Nebula.Server.Data;
 using Nebula.Domain.Entities;
 using Nebula.Shared.Models;
 using StackExchange.Redis;
+using Stripe;
+using Stripe.Checkout;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,6 +88,8 @@ builder.Services.AddHostedService<GameTickService>();
 
 // Add PremiumCurrencyService
 builder.Services.AddScoped<PremiumCurrencyService>();
+
+StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
 var app = builder.Build();
 
@@ -340,6 +344,98 @@ questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, 
     catch (Exception ex)
     {
         return Results.Conflict(ex.Message);
+    }
+});
+
+var paymentsApi = app.MapGroup("/api/payments");
+
+// 1. Endpoint to start the checkout process (Requires Auth)
+paymentsApi.MapPost("/checkout", async (ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+
+    var options = new SessionCreateOptions
+    {
+        PaymentMethodTypes = new List<string> { "card" },
+        LineItems = new List<SessionLineItemOptions>
+        {
+            new SessionLineItemOptions
+            {
+                PriceData = new SessionLineItemPriceDataOptions
+                {
+                    UnitAmount = 500, // $5.00 in cents
+                    Currency = "usd",
+                    ProductData = new SessionLineItemPriceDataProductDataOptions
+                    {
+                        Name = "1,000 Syndicate Coins",
+                    },
+                },
+                Quantity = 1,
+            },
+        },
+        Mode = "payment",
+        SuccessUrl = "https://localhost:5001/store?success=true",
+        CancelUrl = "https://localhost:5001/store?canceled=true",
+        // CRITICAL: We pass the UserId via metadata so the webhook knows who to credit
+        Metadata = new Dictionary<string, string>
+        {
+            { "UserId", userId },
+            { "CreditsAmount", "1000" } 
+        }
+    };
+
+    var service = new SessionService();
+    Session session = await service.CreateAsync(options);
+
+    return Results.Ok(new { Url = session.Url });
+}).RequireAuthorization();
+
+// 2. Endpoint to listen for Stripe Webhooks (NO Auth - Stripe calls this directly)
+paymentsApi.MapPost("/webhook", async (HttpRequest request, IConfiguration config, PremiumCurrencyService premiumService, NebulaDbContext db) =>
+{
+    var json = await new StreamReader(request.Body).ReadToEndAsync();
+    var endpointSecret = config["Stripe:WebhookSecret"];
+
+    try
+    {
+        // 1. Cryptographically verify the payload actually came from Stripe
+        var stripeEvent = EventUtility.ConstructEvent(
+            json,
+            request.Headers["Stripe-Signature"],
+            endpointSecret
+        );
+
+        if (stripeEvent.Type == "checkout.session.completed")
+        {
+            var session = stripeEvent.Data.Object as Session;
+            
+            var userId = Guid.Parse(session!.Metadata["UserId"]);
+            var creditsAmount = int.Parse(session.Metadata["CreditsAmount"]);
+            var sessionId = session.Id;
+
+            // 2. IDEMPOTENCY CHECK: Did we already process this session?
+            var alreadyProcessed = await db.Set<PremiumLedgerEntry>()
+                .AnyAsync(l => l.ReferenceId == sessionId);
+
+            if (!alreadyProcessed)
+            {
+                // 3. Grant the currency using our secure ledger service (Phase 31)
+                await premiumService.AdjustBalanceAsync(
+                    userId, 
+                    creditsAmount, 
+                    Nebula.Domain.Entities.TransactionType.RealMoneyPurchase, 
+                    sessionId);
+                    
+                Console.WriteLine($"[Stripe] Successfully credited user {userId} with {creditsAmount} coins.");
+            }
+        }
+
+        return Results.Ok();
+    }
+    catch (StripeException e)
+    {
+        Console.WriteLine($"[Stripe Webhook Error] {e.Message}");
+        return Results.BadRequest();
     }
 });
 
