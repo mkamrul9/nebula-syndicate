@@ -15,6 +15,8 @@ namespace Nebula.Server.Hubs
         private readonly PlayerConnectionTracker _tracker;
         private readonly GameStateManager _gameStateManager;
 
+        private const string GlobalChannel = "Global";
+
         public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager)
         {
             _matchmaker = matchmaker;
@@ -25,6 +27,10 @@ namespace Nebula.Server.Hubs
         public override async Task OnConnectedAsync()
         {
             var playerId = Context.UserIdentifier;
+            
+            // Add everyone to the Global chat group by default
+            await Groups.AddToGroupAsync(Context.ConnectionId, GlobalChannel);
+            
             if (playerId != null)
             {
                 _tracker.AddConnection(Context.ConnectionId, playerId);
@@ -79,6 +85,40 @@ namespace Nebula.Server.Hubs
             
             Console.WriteLine($"[SignalR] Player Disconnected: {Context.ConnectionId}");
             await base.OnDisconnectedAsync(exception);
+        }
+
+        // The client calls this method when a user hits "Send"
+        public async Task SendChatMessage(string message, string channel)
+        {
+            var playerId = Context.UserIdentifier;
+            var username = Context.User?.Identity?.Name ?? "Unknown Extractor";
+
+            // Basic validation
+            if (string.IsNullOrWhiteSpace(message) || message.Length > 200) return;
+
+            var chatMessage = new ChatMessage
+            {
+                SenderName = username,
+                Message = message,
+                Channel = channel,
+                IsSystemEvent = false
+            };
+
+            if (channel == GlobalChannel)
+            {
+                // Broadcast to everyone in the Lobby
+                await Clients.Group(GlobalChannel).ReceiveChatMessage(chatMessage);
+            }
+            else if (channel == "Match")
+            {
+                // Find out which match this player is in
+                var matchId = _tracker.GetActiveMatchIdForPlayer(playerId!);
+                if (matchId != null)
+                {
+                    // Broadcast ONLY to the players in this specific match
+                    await Clients.Group(matchId).ReceiveChatMessage(chatMessage);
+                }
+            }
         }
 
         // Client calls this to queue for a match

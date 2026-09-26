@@ -1,6 +1,7 @@
 @* File: Nebula.Client/Pages/Lobby.razor *@
 @page "/lobby"
 @using Nebula.Client.Services
+@using Nebula.Shared.Models
 @implements IDisposable
 @inject GameConnectionManager GameManager
 
@@ -16,6 +17,29 @@ else
     <span class="badge bg-warning">Connecting...</span>
 }
 
+<div class="chat-box mt-4 border p-3" style="height: 300px; overflow-y: scroll;">
+    <h5>Global Comms</h5>
+    @foreach (var msg in _chatHistory)
+    {
+        <div class="mb-1">
+            <span class="text-muted">[@msg.Timestamp.ToString("HH:mm:ss")]</span> 
+            @if(msg.IsSystemEvent)
+            {
+                <span class="text-warning fw-bold">SYSTEM: @msg.Message</span>
+            }
+            else
+            {
+                <strong class="text-primary">@msg.SenderName:</strong> <span>@msg.Message</span>
+            }
+        </div>
+    }
+</div>
+
+<div class="input-group mt-2">
+    <input type="text" class="form-control" @bind="_chatInput" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Transmit message..." />
+    <button class="btn btn-secondary" @onclick="SendMessage">Send</button>
+</div>
+
 <div class="mt-4">
     <h5>System Logs:</h5>
     <ul>
@@ -28,11 +52,14 @@ else
 
 @code {
     private List<string> _logs = new();
+    private string _chatInput = string.Empty;
+    private List<ChatMessage> _chatHistory = new();
 
     protected override async Task OnInitializedAsync()
     {
         // Subscribe to events
         GameManager.OnSystemMessageReceived += HandleSystemMessage;
+        GameManager.OnChatMessageReceived += HandleChat;
         
         // Start connection
         await GameManager.ConnectAsync();
@@ -43,15 +70,43 @@ else
         await GameManager.JoinMatchQueue();
     }
 
+    private async Task SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(_chatInput))
+        {
+            await GameManager.SendChatMessage(_chatInput, "Global");
+            _chatInput = string.Empty;
+        }
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
     private void HandleSystemMessage(string message)
     {
         _logs.Add($"{DateTime.Now:T}: {message}");
         InvokeAsync(StateHasChanged); // Force Blazor to re-render the UI
     }
 
+    private void HandleChat(ChatMessage msg)
+    {
+        _chatHistory.Add(msg);
+        
+        // Keep memory footprint small
+        if (_chatHistory.Count > 100) _chatHistory.RemoveAt(0);
+        
+        InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
         // ALWAYS unsubscribe to prevent memory leaks in Blazor
         GameManager.OnSystemMessageReceived -= HandleSystemMessage;
+        GameManager.OnChatMessageReceived -= HandleChat;
     }
 }

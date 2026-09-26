@@ -14,6 +14,7 @@ namespace Nebula.Client.Services
         // C# Events that our UI components will subscribe to
         public event Action<string>? OnSystemMessageReceived;
         public event Action<GameState>? OnGameStateUpdated;
+        public event Action<ChatMessage>? OnChatMessageReceived;
         
         public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
 
@@ -42,6 +43,11 @@ namespace Nebula.Client.Services
             {
                 OnGameStateUpdated?.Invoke(state);
             });
+
+            _hubConnection.On<ChatMessage>(nameof(IGameClient.ReceiveChatMessage), (message) =>
+            {
+                OnChatMessageReceived?.Invoke(message);
+            });
         }
 
         public async Task ConnectAsync()
@@ -58,6 +64,14 @@ namespace Nebula.Client.Services
             if (IsConnected)
             {
                 await _hubConnection.SendAsync("JoinMatchQueue");
+            }
+        }
+
+        public async Task SendChatMessage(string message, string channel)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.SendAsync("SendChatMessage", message, channel);
             }
         }
 
