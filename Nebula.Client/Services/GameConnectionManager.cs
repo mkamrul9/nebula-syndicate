@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Blazored.LocalStorage;
 using Nebula.Shared.Models;
 using Nebula.Shared.Interfaces;
+using Microsoft.AspNetCore.Components;
 
 namespace Nebula.Client.Services
 {
@@ -10,6 +11,7 @@ namespace Nebula.Client.Services
     {
         private readonly HubConnection _hubConnection;
         private readonly ILocalStorageService _localStorage;
+        private readonly NavigationManager _navManager;
 
         // C# Events that our UI components will subscribe to
         public event Action<string>? OnSystemMessageReceived;
@@ -24,9 +26,10 @@ namespace Nebula.Client.Services
         
         public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
 
-        public GameConnectionManager(ILocalStorageService localStorage)
+        public GameConnectionManager(ILocalStorageService localStorage, NavigationManager navManager)
         {
             _localStorage = localStorage;
+            _navManager = navManager;
 
             _hubConnection = new HubConnectionBuilder()
                 // Assuming the server is running on the same domain/port for now
@@ -75,6 +78,14 @@ namespace Nebula.Client.Services
             _hubConnection.On<GameState>(nameof(IGameClient.ReceiveSpectatorTick), (state) =>
             {
                 OnSpectatorTickReceived?.Invoke(state);
+            });
+
+            _hubConnection.On<string>(nameof(IGameClient.ForceDisconnect), async (reason) =>
+            {
+                Console.WriteLine($"[SECURITY] Evicted by server: {reason}");
+                await _localStorage.RemoveItemAsync("authToken");
+                await _hubConnection.StopAsync();
+                _navManager.NavigateTo($"/suspended?reason={Uri.EscapeDataString(reason)}");
             });
         }
 

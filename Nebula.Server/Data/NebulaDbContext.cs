@@ -21,6 +21,7 @@ namespace Nebula.Server.Data
         public DbSet<PlayerClaimedReward> PlayerClaimedRewards { get; set; }
         public DbSet<Tournament> Tournaments { get; set; }
         public DbSet<TournamentMatch> TournamentMatches { get; set; }
+        public DbSet<AdminAuditLog> AdminAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

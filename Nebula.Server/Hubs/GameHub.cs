@@ -6,6 +6,8 @@ using Nebula.Shared.Models;
 using Nebula.Server.Services;
 using System.Collections.Concurrent;
 using Nebula.Server.Models;
+using Microsoft.EntityFrameworkCore;
+using Nebula.Server.Data;
 
 namespace Nebula.Server.Hubs
 {
@@ -16,18 +18,20 @@ namespace Nebula.Server.Hubs
         private readonly PlayerConnectionTracker _tracker;
         private readonly GameStateManager _gameStateManager;
         private readonly string _serverRegion;
+        private readonly NebulaDbContext _dbContext;
 
         private const string GlobalChannel = "Global";
 
         // Tracks the last action time for rate limiting (ConnectionId -> Timestamp)
         private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
 
-        public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager, IConfiguration config)
+        public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager, IConfiguration config, NebulaDbContext dbContext)
         {
             _matchmaker = matchmaker;
             _tracker = tracker;
             _gameStateManager = gameStateManager;
             _serverRegion = config["SERVER_REGION"] ?? "Local-Dev";
+            _dbContext = dbContext;
         }
 
         public override async Task OnConnectedAsync()
@@ -41,6 +45,20 @@ namespace Nebula.Server.Hubs
             
             if (playerId != null)
             {
+                if (Guid.TryParse(playerId, out var userId))
+                {
+                    var player = await _dbContext.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Id == userId);
+                    if (player != null && player.IsBanned)
+                    {
+                        if (player.BanExpiresAtUTC == null || player.BanExpiresAtUTC > DateTime.UtcNow)
+                        {
+                            // They are currently banned. Reject the WebSocket connection.
+                            Context.Abort();
+                            return;
+                        }
+                    }
+                }
+
                 _tracker.AddConnection(Context.ConnectionId, playerId);
                 
                 // Check if this player is reconnecting to an active match

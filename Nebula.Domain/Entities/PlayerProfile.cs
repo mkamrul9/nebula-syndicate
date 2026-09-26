@@ -22,6 +22,11 @@ namespace Nebula.Domain.Entities
         public Guild? Guild { get; set; } // EF Core Navigation property
         
         public GuildRole Role { get; set; } = GuildRole.None;
+        
+        // Moderation
+        public bool IsBanned { get; set; }
+        public DateTime? BanExpiresAtUTC { get; set; }
+        public string? BanReason { get; set; }
     }
 
     public enum GuildRole

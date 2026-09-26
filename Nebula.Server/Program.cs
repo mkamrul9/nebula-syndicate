@@ -1,5 +1,7 @@
 using System.Text;
 using Nebula.Server.Services;
+using Microsoft.AspNetCore.SignalR;
+using Nebula.Shared.Interfaces;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -13,6 +15,8 @@ using Stripe;
 using Stripe.Checkout;
 using OpenTelemetry.Metrics;
 using Microsoft.FeatureManagement;
+using Microsoft.AspNetCore.SignalR;
+using Nebula.Shared.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -628,6 +632,55 @@ seasonApi.MapPost("/claim/{tierId}", async (int tierId, bool claimPremium, Claim
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
+var adminApi = app.MapGroup("/api/admin").RequireAuthorization(policy => policy.RequireRole("Admin"));
+
+adminApi.MapPost("/ban/{targetUserId}", async (
+    Guid targetUserId, 
+    BanRequestDto request, 
+    ClaimsPrincipal adminUser, 
+    NebulaDbContext db, 
+    IHubContext<Nebula.Server.Hubs.GameHub, IGameClient> hubContext) =>
+{
+    var adminIdString = adminUser.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (adminIdString == null || !Guid.TryParse(adminIdString, out var adminId)) return Results.Unauthorized();
+
+    using var tx = await db.Database.BeginTransactionAsync();
+
+    try
+    {
+        var targetPlayer = await db.Players.FindAsync(targetUserId);
+        if (targetPlayer == null) return Results.NotFound();
+        if (targetPlayer.IsBanned) return Results.BadRequest("Player is already banned.");
+
+        targetPlayer.IsBanned = true;
+        targetPlayer.BanReason = request.Reason;
+        targetPlayer.BanExpiresAtUTC = request.DurationHours.HasValue 
+            ? DateTime.UtcNow.AddHours(request.DurationHours.Value) 
+            : null;
+
+        db.Set<AdminAuditLog>().Add(new AdminAuditLog
+        {
+            AdminId = adminId,
+            ActionType = request.DurationHours.HasValue ? "SUSPEND_PLAYER" : "BAN_PLAYER",
+            TargetId = targetUserId.ToString(),
+            Reason = request.Reason
+        });
+
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        await hubContext.Clients.User(targetUserId.ToString())
+            .ForceDisconnect("Your account has been suspended: " + request.Reason);
+
+        return Results.Ok();
+    }
+    catch
+    {
+        await tx.RollbackAsync();
+        return Results.StatusCode(500);
+    }
+});
+
 // Map the scraping endpoint (Prometheus will hit this route)
 app.MapPrometheusScrapingEndpoint("/metrics"); 
 
@@ -650,3 +703,4 @@ app.Run();
 // Define DTO inline for brevity
 public record CreateGuildDto(string Name, string Tag);
 public record DonateDto(int Amount);
+public record BanRequestDto(string Reason, int? DurationHours);

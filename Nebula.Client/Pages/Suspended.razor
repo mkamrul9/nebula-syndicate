@@ -1,0 +1,23 @@
+@page "/suspended"
+
+<div class="container-fluid bg-dark text-white min-vh-100 d-flex justify-content-center align-items-center">
+    <div class="text-center p-5 border border-danger rounded bg-black">
+        <h1 class="text-danger mb-4">ACCOUNT SUSPENDED</h1>
+        <p class="lead">You have been forcibly disconnected from the Nebula Syndicate servers.</p>
+        
+        @if (!string.IsNullOrEmpty(Reason))
+        {
+            <div class="alert alert-danger mt-4">
+                <strong>Reason:</strong> @Reason
+            </div>
+        }
+        
+        <p class="mt-4 text-muted">If you believe this is an error, please contact support.</p>
+        <a href="/" class="btn btn-outline-light mt-3">Return to Home</a>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Reason { get; set; }
+}

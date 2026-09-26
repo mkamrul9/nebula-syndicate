@@ -25,5 +25,8 @@ namespace Nebula.Shared.Interfaces
         
         // Spectator mode delay broadcast
         Task ReceiveSpectatorTick(GameState state);
+        
+        // Moderation
+        Task ForceDisconnect(string reason);
     }
 }
