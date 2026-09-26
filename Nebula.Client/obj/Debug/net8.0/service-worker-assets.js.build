@@ -885,29 +885,29 @@
       "url": "_framework\/icudt_no_CJK.dat"
     },
     {
-      "hash": "sha256-vbB9Gjg+Bo2X1VW0e\/Uvj6\/O92rJivXpaB+j0R1u9OQ=",
+      "hash": "sha256-fQZxMO4qFktSUpxP014Nu8L43ij33nVQtwGUFiB309g=",
       "url": "_framework\/Nebula.Shared.wasm"
     },
     {
-      "hash": "sha256-rcRzeaRi\/G0v9\/ZQkZ1F2PKWT54NdiyGDaYiTX4ibx0=",
+      "hash": "sha256-AV3j1gZZQEhrCSfPp0qlPFxWD\/AiUlLmTzG2B0hXjQ4=",
       "url": "_framework\/Nebula.Shared.pdb"
     },
     {
-      "hash": "sha256-9zbGWCPadShJCqR\/rI4o\/+iaizDhCbgE9xmq+oLGUw4=",
+      "hash": "sha256-Ivwn6Q+1rgS9MzAUj+z8tx4vbIAE39wHKBAHprrRBsw=",
       "url": "_framework\/Nebula.Client.wasm"
     },
     {
-      "hash": "sha256-tGIZnZi+o0PE06nkxj6d\/Iz\/6TBet0szNMaelU3HY\/0=",
+      "hash": "sha256-arkTNdsPEBol3XjVHrJe2LCQuATo91yLEbu7blRqlus=",
       "url": "_framework\/Nebula.Client.pdb"
     },
     {
-      "hash": "sha256-2C+NeVmte94f6AyYPm3+Ig8Z8o3daVie59jP85NrAtg=",
+      "hash": "sha256-H51uMmXu6QUKLkbMl6ClxFEWGlIVZUmKGCyFz69V8g8=",
       "url": "_framework\/es\/Nebula.Client.resources.wasm"
     },
     {
-      "hash": "sha256-wE7hUaME\/yS4mB4lz7T8RpkV0MnmjtY4fm7nVpdtH6g=",
+      "hash": "sha256-ySqKDYE4SWj2ZMLubPVSywhdyI01BSNNW4dDHFJ2hKs=",
       "url": "_framework\/blazor.boot.json"
     }
   ],
-  "version": "zGYuSjz+"
+  "version": "Rt7g7jG4"
 };

@@ -62,6 +62,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcUmVwbGF5Vmlld2VyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Spectate.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3BlY3RhdGUucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/SWE/UNIQUE WORK/.NET_game/Nebula.Client/Pages/Store.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3RvcmUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 

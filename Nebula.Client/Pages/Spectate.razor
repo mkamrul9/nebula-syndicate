@@ -1,0 +1,55 @@
+@page "/spectate/{MatchId}"
+@using Nebula.Shared.Models
+@using Nebula.Client.Services
+@inject GameConnectionManager GameManager
+@implements IDisposable
+
+<div class="container-fluid bg-dark text-white min-vh-100">
+    @if (_delayedState == null)
+    {
+        <div class="d-flex justify-content-center align-items-center vh-100">
+            <h3 class="text-warning blink">BUFFERING BROADCAST DELAY...</h3>
+        </div>
+    }
+    else
+    {
+        <!-- Broadcaster UI: Shows both players' economies simultaneously -->
+        <div class="row pt-3">
+            @foreach (var player in _delayedState.Players.Values)
+            {
+                <div class="col-md-6 border-end border-secondary">
+                    <h2 class="text-info">@player.PlayerName</h2>
+                    <h4 class="text-success">Bank: ₡@Math.Floor(player.Credits)</h4>
+                    <p>Ironium Drones: @player.ActiveIroniumDrones</p>
+                    <p>Plasma Drones: @player.ActivePlasmaDrones</p>
+                </div>
+            }
+        </div>
+        
+        <!-- Aggregate Market Chart would go here -->
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string MatchId { get; set; } = string.Empty;
+
+    private GameState? _delayedState;
+
+    protected override async Task OnInitializedAsync()
+    {
+        GameManager.OnSpectatorTickReceived += UpdateView;
+        await GameManager.StartWatchingMatchAsync(MatchId);
+    }
+
+    private void UpdateView(GameState state)
+    {
+        _delayedState = state;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        GameManager.OnSpectatorTickReceived -= UpdateView;
+    }
+}

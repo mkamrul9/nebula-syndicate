@@ -22,5 +22,8 @@ namespace Nebula.Shared.Interfaces
         
         // Pushes global notifications to the user
         Task ReceiveGlobalNotification(NotificationPayload payload);
+        
+        // Spectator mode delay broadcast
+        Task ReceiveSpectatorTick(GameState state);
     }
 }

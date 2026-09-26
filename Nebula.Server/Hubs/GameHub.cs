@@ -153,6 +153,17 @@ namespace Nebula.Server.Hubs
             await Clients.Caller.ReceiveSystemMessage("Entered matchmaking queue. Searching for rivals...");
         }
 
+        public async Task WatchMatch(string matchId)
+        {
+            if (_gameStateManager.GetMatch(matchId) == null)
+            {
+                throw new HubException("Match not found or already ended.");
+            }
+
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"spectators_{matchId}");
+            Console.WriteLine($"[Spectator] User {Context.ConnectionId} is watching match {matchId}");
+        }
+
         // Helper method to check rate limit
         private bool IsRateLimited()
         {

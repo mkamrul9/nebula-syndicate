@@ -5,6 +5,8 @@ using Nebula.Shared.Interfaces;
 using Nebula.Shared.Models;
 using System.Diagnostics.Metrics;
 using System.Diagnostics;
+using MessagePack;
+using System.Collections.Concurrent;
 
 namespace Nebula.Server.Services
 {
@@ -14,8 +16,11 @@ namespace Nebula.Server.Services
         private readonly IHubContext<GameHub, IGameClient> _hubContext;
         private readonly IServiceProvider _serviceProvider;
         
-        // 10 ticks per second (100ms per tick)
         private const int TickIntervalMilliseconds = 100; 
+        
+        // Configurable delay: 10Hz tick rate * 60 seconds * 3 minutes = 1800 ticks
+        private const int SpectatorDelayTicks = 1800;
+        private readonly ConcurrentDictionary<string, Queue<byte[]>> _spectatorBuffers = new();
         
         // Define our metrics
         private readonly Counter<long> _ticksProcessedCounter;
@@ -284,6 +289,7 @@ namespace Nebula.Server.Services
 
                         // 2. Remove from active memory to free up RAM
                         _gameStateManager.EndMatch(state.MatchId);
+                        _spectatorBuffers.TryRemove(state.MatchId, out _);
                         
                         // Skip further processing for this match this tick
                         return; 
@@ -292,6 +298,21 @@ namespace Nebula.Server.Services
                     // Broadcast the updated state to the specific match group
                     await _hubContext.Clients.Group(state.MatchId)
                         .ReceiveGameStateTick(state);
+
+                    // 2. Clone the state for the delay buffer using MessagePack
+                    var buffer = _spectatorBuffers.GetOrAdd(state.MatchId, _ => new Queue<byte[]>());
+                    byte[] snapshot = MessagePackSerializer.Serialize(state);
+                    buffer.Enqueue(snapshot);
+
+                    // 3. Broadcast to spectators only after the delay threshold is met
+                    if (buffer.Count >= SpectatorDelayTicks)
+                    {
+                        var delayedSnapshot = buffer.Dequeue();
+                        var delayedState = MessagePackSerializer.Deserialize<GameState>(delayedSnapshot);
+
+                        await _hubContext.Clients.Group($"spectators_{state.MatchId}")
+                            .ReceiveSpectatorTick(delayedState);
+                    }
                 });
 
                 stopwatch.Stop();

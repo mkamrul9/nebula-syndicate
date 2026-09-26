@@ -17,6 +17,7 @@ namespace Nebula.Client.Services
         public event Action<ChatMessage>? OnChatMessageReceived;
         public event Action<string>? OnMatchJoined;
         public event Action<NotificationPayload>? OnGlobalNotificationReceived;
+        public event Action<GameState>? OnSpectatorTickReceived;
         
         public string CurrentRegion { get; private set; } = "Unknown";
         public event Action? OnStateChanged;
@@ -70,6 +71,11 @@ namespace Nebula.Client.Services
                 CurrentRegion = regionName;
                 OnStateChanged?.Invoke();
             });
+
+            _hubConnection.On<GameState>(nameof(IGameClient.ReceiveSpectatorTick), (state) =>
+            {
+                OnSpectatorTickReceived?.Invoke(state);
+            });
         }
 
         public async Task ConnectAsync()
@@ -110,6 +116,14 @@ namespace Nebula.Client.Services
             if (IsConnected)
             {
                 await _hubConnection.SendAsync("JoinMatchQueue");
+            }
+        }
+
+        public async Task StartWatchingMatchAsync(string matchId)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.SendAsync("WatchMatch", matchId);
             }
         }
 
