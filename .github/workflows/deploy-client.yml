@@ -1,0 +1,26 @@
+# File: .github/workflows/deploy-client.yml
+name: Deploy Nebula Client to Azure Static Web Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Nebula.Client/**'
+      - 'Nebula.Shared/**'
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build And Deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "/Nebula.Client"
+          api_location: "" 
+          output_location: "wwwroot"
