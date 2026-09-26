@@ -16,5 +16,8 @@ namespace Nebula.Shared.Interfaces
         
         // New method for structured chat
         Task ReceiveChatMessage(ChatMessage message); 
+        
+        // Pushes global notifications to the user
+        Task ReceiveGlobalNotification(NotificationPayload payload);
     }
 }

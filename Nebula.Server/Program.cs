@@ -78,6 +78,9 @@ builder.Services.AddHostedService(provider => provider.GetRequiredService<Matchm
 builder.Services.AddSingleton<MatchPersisterService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<MatchPersisterService>());
 
+// Add NotificationService for pushing Global Toasts
+builder.Services.AddSingleton<NotificationService>();
+
 // Add the Game Tick Server
 builder.Services.AddHostedService<GameTickService>();
 
