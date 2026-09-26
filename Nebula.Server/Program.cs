@@ -70,6 +70,10 @@ builder.Services.AddSingleton<PlayerConnectionTracker>();
 builder.Services.AddSingleton<MatchmakingService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<MatchmakingService>());
 
+// Add the Match Persister Service
+builder.Services.AddSingleton<MatchPersisterService>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<MatchPersisterService>());
+
 // Add the Game Tick Server
 builder.Services.AddHostedService<GameTickService>();
 

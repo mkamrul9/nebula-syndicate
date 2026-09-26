@@ -9,16 +9,19 @@ namespace Nebula.Server.Services
     {
         private readonly GameStateManager _gameStateManager;
         private readonly IHubContext<GameHub, IGameClient> _hubContext;
+        private readonly IServiceProvider _serviceProvider;
         
         // 10 ticks per second (100ms per tick)
         private const int TickIntervalMilliseconds = 100; 
 
         public GameTickService(
             GameStateManager gameStateManager, 
-            IHubContext<GameHub, IGameClient> hubContext)
+            IHubContext<GameHub, IGameClient> hubContext,
+            IServiceProvider serviceProvider)
         {
             _gameStateManager = gameStateManager;
             _hubContext = hubContext;
+            _serviceProvider = serviceProvider;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -179,6 +182,40 @@ namespace Nebula.Server.Services
                             // 5. Decay Pressure: Player influence fades over time
                             state.MarketPressures[resource] *= 0.90m; // 10% decay per second
                         }
+                    }
+
+                    const decimal VictoryThreshold = 50000.0m;
+                    bool matchEnded = false;
+                    string? winnerId = null;
+
+                    foreach (var playerEntry in state.Players)
+                    {
+                        if (playerEntry.Value.Credits >= VictoryThreshold)
+                        {
+                            matchEnded = true;
+                            winnerId = playerEntry.Key;
+                            break; // First one to cross the line wins
+                        }
+                    }
+
+                    if (matchEnded)
+                    {
+                        state.Status = GameStatus.Finished;
+                        
+                        // Broadcast the final definitive state
+                        await _hubContext.Clients.Group(state.MatchId).ReceiveGameStateTick(state);
+                        await _hubContext.Clients.Group(state.MatchId)
+                            .ReceiveSystemMessage($"SIMULATION CONCLUDED. Winner: {state.Players[winnerId!].PlayerName}");
+
+                        // 1. Send to the background DB worker
+                        var persister = _serviceProvider.GetRequiredService<MatchPersisterService>();
+                        persister.QueueFinishedMatch(state);
+
+                        // 2. Remove from active memory to free up RAM
+                        _gameStateManager.EndMatch(state.MatchId);
+                        
+                        // Skip further processing for this match this tick
+                        return; 
                     }
 
                     // Broadcast the updated state to the specific match group

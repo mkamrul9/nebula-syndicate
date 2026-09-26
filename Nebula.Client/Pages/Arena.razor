@@ -4,6 +4,31 @@
 @using Nebula.Shared.Models
 @implements IDisposable
 @inject GameConnectionManager GameManager
+@inject NavigationManager NavManager
+
+@if (_latestState?.Status == GameStatus.Finished)
+{
+    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 1050;">
+        <div class="card bg-black border border-warning p-5 text-center shadow-lg" style="min-width: 400px;">
+            @if (_myState?.Credits >= 50000.0m)
+            {
+                <h1 class="text-success display-3 fw-bold mb-3">VICTORY</h1>
+                <p class="lead text-light">Extraction Rights Secured.</p>
+            }
+            else
+            {
+                <h1 class="text-danger display-3 fw-bold mb-3">DEFEAT</h1>
+                <p class="lead text-light">Your syndicate has been liquidated.</p>
+            }
+            <hr class="border-secondary" />
+            <h4 class="text-warning">Final Credits: ₡@Math.Floor(_myState?.Credits ?? 0)</h4>
+            
+            <button class="btn btn-outline-warning mt-4" @onclick='() => NavManager.NavigateTo("/lobby")'>
+                RETURN TO LOBBY
+            </button>
+        </div>
+    </div>
+}
 
 @if (_latestState == null)
 {
