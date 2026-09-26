@@ -10,6 +10,7 @@ namespace Nebula.Server.Data
 
         public DbSet<PlayerProfile> Players { get; set; }
         public DbSet<MatchRecord> MatchRecords { get; set; }
+        public DbSet<Guild> Guilds { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -19,6 +20,18 @@ namespace Nebula.Server.Data
             modelBuilder.Entity<PlayerProfile>()
                 .HasIndex(p => p.Username)
                 .IsUnique();
+
+            modelBuilder.Entity<Guild>()
+                .HasIndex(g => g.Name).IsUnique(); // Guild names must be unique
+                
+            modelBuilder.Entity<Guild>()
+                .HasIndex(g => g.Tag).IsUnique(); // Tags must be unique
+
+            modelBuilder.Entity<PlayerProfile>()
+                .HasOne(p => p.Guild)
+                .WithMany(g => g.Members)
+                .HasForeignKey(p => p.GuildId)
+                .OnDelete(DeleteBehavior.SetNull); // If guild is deleted, players just become guildless
         }
     }
 }

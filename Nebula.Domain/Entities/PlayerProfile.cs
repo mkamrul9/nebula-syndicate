@@ -14,5 +14,18 @@ namespace Nebula.Domain.Entities
         public int TotalWins { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public Guid? GuildId { get; set; }
+        public Guild? Guild { get; set; } // EF Core Navigation property
+        
+        public GuildRole Role { get; set; } = GuildRole.None;
+    }
+
+    public enum GuildRole
+    {
+        None,
+        Member,
+        Officer,
+        Leader
     }
 }

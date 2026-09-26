@@ -207,7 +207,64 @@ app.MapGet("/api/replay/{matchId}", async (Guid matchId, NebulaDbContext db) =>
     return Results.Content(match.ReplayDataJson, "application/json");
 });
 
+var guildApi = app.MapGroup("/api/guilds").RequireAuthorization();
+
+// Create a new Guild
+guildApi.MapPost("/create", async (CreateGuildDto request, ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    
+    // 1. Verify player exists and isn't already in a guild
+    var player = await db.Players.FindAsync(userId);
+    if (player == null) return Results.NotFound();
+    if (player.GuildId != null) return Results.BadRequest("You are already in a syndicate.");
+
+    // 2. Verify name/tag uniqueness
+    if (await db.Guilds.AnyAsync(g => g.Name == request.Name || g.Tag == request.Tag))
+    {
+        return Results.Conflict("Syndicate Name or Tag already claimed.");
+    }
+
+    // 3. Create the Guild
+    var guild = new Guild
+    {
+        Id = Guid.NewGuid(),
+        Name = request.Name,
+        Tag = request.Tag,
+        LeaderId = userId
+    };
+
+    db.Guilds.Add(guild);
+
+    // 4. Update the player
+    player.GuildId = guild.Id;
+    player.Role = GuildRole.Leader;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { GuildId = guild.Id, Name = guild.Name });
+});
+
+// Leave a Guild
+guildApi.MapPost("/leave", async (ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var player = await db.Players.FindAsync(userId);
+    
+    if (player == null || player.GuildId == null) return Results.BadRequest("Not in a syndicate.");
+    if (player.Role == GuildRole.Leader) return Results.BadRequest("Leaders must pass leadership before leaving.");
+
+    player.GuildId = null;
+    player.Role = GuildRole.None;
+
+    await db.SaveChangesAsync();
+    return Results.Ok();
+});
+
 // Map the GameHub to a route
 app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
 app.Run();
+
+// Define DTO inline for brevity
+public record CreateGuildDto(string Name, string Tag);
