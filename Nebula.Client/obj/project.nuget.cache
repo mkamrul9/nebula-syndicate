@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "MuqS+dohCjg=",
+  "dgSpecHash": "vPg3rYN/Ip8=",
   "success": true,
   "projectFilePath": "D:\\SWE\\UNIQUE WORK\\.NET_game\\Nebula.Client\\Nebula.Client.csproj",
   "expectedPackageFiles": [
@@ -31,6 +31,8 @@
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\8.0.0\\microsoft.extensions.fileproviders.abstractions.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.fileproviders.physical\\8.0.0\\microsoft.extensions.fileproviders.physical.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.filesystemglobbing\\8.0.0\\microsoft.extensions.filesystemglobbing.8.0.0.nupkg.sha512",
+    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.localization\\8.0.0\\microsoft.extensions.localization.8.0.0.nupkg.sha512",
+    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.localization.abstractions\\8.0.0\\microsoft.extensions.localization.abstractions.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.logging\\8.0.1\\microsoft.extensions.logging.8.0.1.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\8.0.3\\microsoft.extensions.logging.abstractions.8.0.3.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.options\\8.0.2\\microsoft.extensions.options.8.0.2.nupkg.sha512",

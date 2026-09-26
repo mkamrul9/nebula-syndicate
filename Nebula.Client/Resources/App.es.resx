@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <data name="Deploy_Drone" xml:space="preserve">
+    <value>Desplegar Dron</value>
+  </data>
+  <data name="Insufficient_Funds" xml:space="preserve">
+    <value>Fondos Insuficientes</value>
+  </data>
+</root>

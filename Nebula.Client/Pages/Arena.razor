@@ -4,6 +4,8 @@
 @using Nebula.Client.Components
 @using Nebula.Shared.Models
 @implements IDisposable
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<Nebula.Client.App> Loc
 @inject GameConnectionManager GameManager
 @inject NavigationManager NavManager
 
@@ -76,8 +78,9 @@ else
                                 <button class="btn btn-sm btn-outline-secondary" 
                                         disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
                                         @onclick="@(() => HandleDeployClick("Ironium"))">
-                                    DEPLOY (₡500)
+                                    @Loc["Deploy_Drone"] (₡500)
                                 </button>
+                                @if (!CanAffordDrone) { <div class="text-danger small mt-1">@Loc["Insufficient_Funds"]</div> }
                             </div>
 
                             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -89,8 +92,9 @@ else
                                 <button class="btn btn-sm btn-outline-info" 
                                         disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
                                         @onclick="@(() => HandleDeployClick("Plasma"))">
-                                    DEPLOY (₡500)
+                                    @Loc["Deploy_Drone"] (₡500)
                                 </button>
+                                @if (!CanAffordDrone) { <div class="text-danger small mt-1">@Loc["Insufficient_Funds"]</div> }
                             </div>
 
                             <div class="mt-4 p-3 bg-dark border border-secondary rounded">

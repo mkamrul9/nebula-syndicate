@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Nebula.Client;
 using Nebula.Client.Services;
 using Blazored.LocalStorage;
+using Microsoft.JSInterop;
+using System.Globalization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -15,4 +17,20 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddScoped<GameConnectionManager>();
 
-await builder.Build().RunAsync();
+// 1. Register Localization Services
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
+
+var host = builder.Build();
+
+// 2. Read the user's saved language preference via JS Interop before rendering UI
+var jsInterop = host.Services.GetRequiredService<IJSRuntime>();
+var result = await jsInterop.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
+
+// 3. Apply the Culture
+var cultureName = !string.IsNullOrWhiteSpace(result) ? result : "en-US";
+var culture = new CultureInfo(cultureName);
+
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
+
+await host.RunAsync();

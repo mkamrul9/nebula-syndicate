@@ -5,7 +5,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+    <BlazorWebAssemblyLoadAllGlobalizationData>false</BlazorWebAssemblyLoadAllGlobalizationData>
   </PropertyGroup>
+
+  <ItemGroup>
+    <BlazorWebAssemblySupportedCulture Include="en-US" />
+    <BlazorWebAssemblySupportedCulture Include="es-ES" />
+    <BlazorWebAssemblySupportedCulture Include="ru-RU" />
+    <BlazorWebAssemblySupportedCulture Include="zh-CN" />
+  </ItemGroup>
 
   <ItemGroup>
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
@@ -21,7 +29,7 @@
     <TrimMode>link</TrimMode>
     
     <!-- Disable timezone/globalization data if your game doesn't need it -->
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
@@ -29,6 +37,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.30" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.*" />
     <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
