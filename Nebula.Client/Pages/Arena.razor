@@ -22,9 +22,22 @@ else
                     <div class="card-header border-bottom border-info fw-bold">
                         MY SYNDICATE
                     </div>
-                    <div class="card-body">
+                    <!-- Apply the EMP visual override dynamically -->
+                    <div class="card-body @(_myState != null && _myState.IsEmpMuted ? "emp-overlay" : "")">
                         @if (_myState != null)
                         {
+                            @if (_myState.IsEmpMuted)
+                            {
+                                <!-- Calculate remaining seconds based on server ticks (assuming 10 ticks/sec) -->
+                                var remainingTicks = _myState.EmpExpirationTick - _latestState!.CurrentTick;
+                                var remainingSeconds = Math.Max(0, remainingTicks / 10.0);
+                                
+                                <div class="alert bg-dark border-danger glitch-text mb-3">
+                                    SYSTEMS OFFLINE<br />
+                                    REBOOTING IN: @remainingSeconds.ToString("F1")s
+                                </div>
+                            }
+
                             <h2 class="text-warning">₡ @Math.Floor(_myState.Credits)</h2>
                             <hr />
                             
@@ -53,11 +66,6 @@ else
                                     DEPLOY (₡500)
                                 </button>
                             </div>
-                            
-                            @if (_myState.IsEmpMuted)
-                            {
-                                <div class="alert alert-danger blink-text">COMMAND UPLINK SEVERED (EMP ACTIVE)</div>
-                            }
                         }
                     </div>
                 </div>
@@ -92,18 +100,26 @@ else
             <div class="col-md-3">
                 <div class="card bg-danger text-white">
                     <div class="card-header border-bottom border-dark fw-bold">
-                        RIVAL INTEL
+                        RIVAL INTEL & OFFENSE
                     </div>
                     <div class="card-body">
                         @foreach (var opp in _opponents)
                         {
-                            <div class="mb-3 border-bottom pb-2">
-                                <h6>@opp.PlayerName 
-                                    @if(!opp.IsConnected) { <span class="badge bg-warning">OFFLINE</span> }
+                            <div class="mb-3 border-bottom border-dark pb-3">
+                                <h6>@opp.Value.PlayerName 
+                                    @if(!opp.Value.IsConnected) { <span class="badge bg-warning text-dark">OFFLINE</span> }
+                                    @if(opp.Value.IsEmpMuted) { <span class="badge bg-dark text-danger blink">EMP'D</span> }
                                 </h6>
-                                <!-- We only show their active drones, resources are hidden fog-of-war! -->
-                                <div>Ironium Drones: @opp.ActiveIroniumDrones</div>
-                                <div>Plasma Drones: @opp.ActivePlasmaDrones</div>
+                                <div class="small text-light mb-2">
+                                    Ironium Drones: @opp.Value.ActiveIroniumDrones | Plasma Drones: @opp.Value.ActivePlasmaDrones
+                                </div>
+                                
+                                <!-- 1-Click Sabotage Button -->
+                                <button class="btn btn-sm btn-dark text-danger w-100 fw-bold border-danger"
+                                        disabled="@(!CanAffordEmp || _isActionLocked || _myState!.IsEmpMuted)"
+                                        @onclick="@(() => HandleSabotageClick(opp.Key, SabotageType.EMP))">
+                                    LAUNCH EMP (₡2000)
+                                </button>
                             </div>
                         }
                     </div>
@@ -119,16 +135,18 @@ else
 
     private GameState? _latestState;
     private PlayerState? _myState;
-    private List<PlayerState> _opponents = new();
+    private List<KeyValuePair<string, PlayerState>> _opponents = new();
     
     private string _myPlayerId = string.Empty;
     private DateTime _lastRender = DateTime.MinValue;
 
     private const decimal DroneCost = 500.0m;
+    private const decimal EmpCost = 2000.0m;
     private bool _isActionLocked = false;
 
     // Local validation property
     private bool CanAffordDrone => _myState != null && _myState.Credits >= DroneCost;
+    private bool CanAffordEmp => _myState != null && _myState.Credits >= EmpCost;
 
     private async Task HandleDeployClick(string resource)
     {
@@ -146,6 +164,18 @@ else
         
         // No StateHasChanged() needed here because HandleGameState 
         // fires every 100-200ms anyway and will redraw the unlocked button.
+    }
+
+    private async Task HandleSabotageClick(string targetId, SabotageType type)
+    {
+        if (!CanAffordEmp || _isActionLocked) return;
+
+        _isActionLocked = true;
+        await GameManager.LaunchSabotageAsync(targetId, type);
+        
+        // Brief local lock to prevent double-spending UI bugs
+        await Task.Delay(200);
+        _isActionLocked = false;
     }
 
     protected override async Task OnInitializedAsync()
@@ -167,7 +197,7 @@ else
         {
             _myState = mine;
         }
-        _opponents = state.Players.Where(p => p.Key != _myPlayerId).Select(p => p.Value).ToList();
+        _opponents = state.Players.Where(p => p.Key != _myPlayerId).ToList();
 
         // 3. UI Render Throttling (Render max 5 times a second to save CPU)
         if ((DateTime.UtcNow - _lastRender).TotalMilliseconds > 200)

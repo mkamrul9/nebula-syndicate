@@ -72,6 +72,14 @@ namespace Nebula.Client.Services
             }
         }
 
+        public async Task LaunchSabotageAsync(string targetPlayerId, SabotageType sabotageType)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.SendAsync("LaunchSabotage", targetPlayerId, sabotageType);
+            }
+        }
+
         // Method for the UI to send commands to the server
         public async Task JoinMatchQueue()
         {

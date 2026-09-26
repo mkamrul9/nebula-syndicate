@@ -101,3 +101,26 @@ a, .btn-link {
 code {
     color: #c02d76;
 }
+
+/* Sabotage EMP Effects */
+.emp-overlay {
+    position: relative;
+    pointer-events: none; /* Prevents any clicks */
+    filter: grayscale(80%) sepia(50%) hue-rotate(-50deg) saturate(300%);
+    opacity: 0.6;
+    transition: all 0.2s ease-in;
+}
+
+@keyframes glitch-strobe {
+    0% { opacity: 1; color: red; }
+    50% { opacity: 0.2; color: darkred; }
+    100% { opacity: 1; color: red; }
+}
+
+.glitch-text {
+    animation: glitch-strobe 0.5s infinite;
+    font-family: monospace;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+}
