@@ -66,7 +66,18 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add SignalR services
-builder.Services.AddSignalR(); 
+builder.Services.AddSignalR(options =>
+    {
+        // Keep the heartbeat fast for real-time responsiveness
+        options.KeepAliveInterval = TimeSpan.FromSeconds(5);
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(15);
+    })
+    .AddStackExchangeRedis(redisConnection!, options =>
+    {
+        // Prefix prevents channel collisions if you run multiple environments 
+        // (e.g., Staging and Prod) on the same Redis cluster.
+        options.Configuration.ChannelPrefix = "Nebula_Prod";
+    }); 
 
 // Add the GameStateManager as a Singleton so we can hold the live state in RAM
 builder.Services.AddSingleton<GameStateManager>();
