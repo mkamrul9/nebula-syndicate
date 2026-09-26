@@ -12,6 +12,7 @@ namespace Nebula.Server.Data
         public DbSet<MatchRecord> MatchRecords { get; set; }
         public DbSet<Guild> Guilds { get; set; }
         public DbSet<PlayerQuest> PlayerQuests { get; set; }
+        public DbSet<PremiumLedgerEntry> PremiumLedgerEntries { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

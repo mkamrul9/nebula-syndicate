@@ -26,7 +26,7 @@ namespace Nebula.Client.Services
 
             _hubConnection = new HubConnectionBuilder()
                 // Assuming the server is running on the same domain/port for now
-                .WithUrl("https://localhost:7001/gamehub", options =>
+                .WithUrl("http://localhost:5168/gamehub", options =>
                 {
                     // Dynamically provide the JWT for authentication
                     options.AccessTokenProvider = async () => 

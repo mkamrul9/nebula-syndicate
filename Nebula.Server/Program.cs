@@ -84,6 +84,9 @@ builder.Services.AddSingleton<NotificationService>();
 // Add the Game Tick Server
 builder.Services.AddHostedService<GameTickService>();
 
+// Add PremiumCurrencyService
+builder.Services.AddScoped<PremiumCurrencyService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -102,8 +105,21 @@ app.MapPost("/api/auth/login", async (LoginDto request, NebulaDbContext db, ICon
 {
     var user = await db.Players.SingleOrDefaultAsync(p => p.Username == request.Username);
     
+    // Auto-register if user doesn't exist (for prototype testing)
+    if (user == null)
+    {
+        user = new PlayerProfile
+        {
+            Id = Guid.NewGuid(),
+            Username = request.Username,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            PremiumCredits = 1000 // Give them some starting credits
+        };
+        db.Players.Add(user);
+        await db.SaveChangesAsync();
+    }
     // Verify password (using BCrypt for example)
-    if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+    else if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
     {
         return Results.Unauthorized();
     }
@@ -264,94 +280,66 @@ guildApi.MapPost("/leave", async (ClaimsPrincipal user, NebulaDbContext db) =>
     return Results.Ok();
 });
 
-guildApi.MapPost("/vault/donate", async (DonateDto request, ClaimsPrincipal user, NebulaDbContext db) =>
+guildApi.MapPost("/vault/donate", async (DonateDto request, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
 {
     var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
     
-    // 1. Begin a strict database transaction
-    using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead);
+    var player = await db.Players.FindAsync(userId);
+    if (player == null || player.GuildId == null) 
+        return Results.BadRequest("Not in a syndicate.");
 
+    var guild = await db.Guilds.FindAsync(player.GuildId);
+    if (guild == null) 
+        return Results.NotFound();
+
+    if (request.Amount <= 0) 
+        return Results.BadRequest("Invalid amount.");
+        
     try
     {
-        // 2. Fetch records
-        var player = await db.Players.FindAsync(userId);
-        if (player == null || player.GuildId == null) 
-            return Results.BadRequest("Not in a syndicate.");
-
-        var guild = await db.Guilds.FindAsync(player.GuildId);
-        if (guild == null) 
-            return Results.NotFound();
-
-        // 3. Validate logic
-        if (request.Amount <= 0) 
-            return Results.BadRequest("Invalid amount.");
-            
-        if (player.PremiumCredits < request.Amount) 
-            return Results.BadRequest("Insufficient funds.");
-
-        // 4. Perform the transfer
-        player.PremiumCredits -= request.Amount;
         guild.VaultCredits += request.Amount;
-
-        // Update concurrency tokens so other simultaneous transactions fail
-        player.Version = Guid.NewGuid();
         guild.Version = Guid.NewGuid();
-
-        // 5. Save changes
-        await db.SaveChangesAsync();
         
-        // 6. Commit the transaction ONLY if SaveChangesAsync succeeded without concurrency exceptions
-        await transaction.CommitAsync();
+        var success = await premiumService.AdjustBalanceAsync(userId, -request.Amount, TransactionType.GuildVaultDonation, guild.Id.ToString());
+        
+        if (!success)
+            return Results.BadRequest("Insufficient funds or invalid transaction.");
 
         return Results.Ok(new { NewBalance = player.PremiumCredits, VaultTotal = guild.VaultCredits });
     }
-    catch (DbUpdateConcurrencyException)
+    catch (Exception ex)
     {
-        // A hacker (or lag) tried to double-spend at the exact same millisecond.
-        // The transaction automatically rolls back.
-        await transaction.RollbackAsync();
-        return Results.Conflict("Transaction collision detected. Please try again.");
-    }
-    catch (Exception)
-    {
-        await transaction.RollbackAsync();
-        return Results.StatusCode(500);
+        return Results.Conflict(ex.Message);
     }
 });
 
 var questApi = app.MapGroup("/api/quests").RequireAuthorization();
 
-questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, NebulaDbContext db) =>
+questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
 {
     var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
     
-    // Use a transaction to prevent double-claiming via concurrent requests
-    using var transaction = await db.Database.BeginTransactionAsync();
+    var quest = await db.Set<PlayerQuest>().FirstOrDefaultAsync(q => q.Id == questId && q.PlayerId == userId);
+    
+    if (quest == null) return Results.NotFound();
+    if (!quest.IsCompleted) return Results.BadRequest("Quest not completed yet.");
+    if (quest.IsClaimed) return Results.BadRequest("Reward already claimed.");
 
     try
     {
-        var quest = await db.Set<PlayerQuest>().FirstOrDefaultAsync(q => q.Id == questId && q.PlayerId == userId);
+        quest.IsClaimed = true;
         
-        if (quest == null) return Results.NotFound();
-        if (!quest.IsCompleted) return Results.BadRequest("Quest not completed yet.");
-        if (quest.IsClaimed) return Results.BadRequest("Reward already claimed.");
+        var success = await premiumService.AdjustBalanceAsync(userId, quest.RewardCredits, TransactionType.QuestReward, quest.Id.ToString());
+        
+        if (!success)
+            return Results.BadRequest("Failed to claim reward.");
 
         var player = await db.Players.FindAsync(userId);
-        if (player == null) return Results.NotFound();
-
-        // Apply reward and mark claimed
-        player.PremiumCredits += quest.RewardCredits;
-        quest.IsClaimed = true;
-
-        await db.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        return Results.Ok(new { NewBalance = player.PremiumCredits });
+        return Results.Ok(new { NewBalance = player?.PremiumCredits ?? 0 });
     }
-    catch
+    catch (Exception ex)
     {
-        await transaction.RollbackAsync();
-        return Results.StatusCode(500);
+        return Results.Conflict(ex.Message);
     }
 });
 
