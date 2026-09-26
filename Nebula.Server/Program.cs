@@ -64,6 +64,7 @@ builder.Services.AddSignalR();
 
 // Add the GameStateManager as a Singleton so we can hold the live state in RAM
 builder.Services.AddSingleton<GameStateManager>();
+builder.Services.AddSingleton<PlayerConnectionTracker>();
 
 // Add the Background Service as a Singleton so the Hub can inject it
 builder.Services.AddSingleton<MatchmakingService>();

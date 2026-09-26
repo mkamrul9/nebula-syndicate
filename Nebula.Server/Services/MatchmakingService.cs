@@ -16,13 +16,16 @@ namespace Nebula.Server.Services
         private const int PlayersRequired = 2; 
 
         private readonly GameStateManager _gameStateManager;
+        private readonly PlayerConnectionTracker _tracker;
 
         public MatchmakingService(
             IHubContext<GameHub, IGameClient> hubContext, 
-            GameStateManager gameStateManager)
+            GameStateManager gameStateManager,
+            PlayerConnectionTracker tracker)
         {
             _hubContext = hubContext;
             _gameStateManager = gameStateManager;
+            _tracker = tracker;
         }
 
         // The Hub calls this method to add players
@@ -75,6 +78,10 @@ namespace Nebula.Server.Services
                 }
                 var playerIds = matchedPlayers.Select(p => p.PlayerId);
                 _gameStateManager.InitializeMatch(matchId, playerIds);
+                foreach (var id in playerIds)
+                {
+                    _tracker.AssignPlayerToMatch(id, matchId);
+                }
             }
             else
             {

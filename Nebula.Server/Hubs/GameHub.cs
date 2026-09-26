@@ -8,15 +8,77 @@ using Nebula.Server.Models;
 
 namespace Nebula.Server.Hubs
 {
-    // [Authorize] ensures only logged-in users with a valid JWT can connect!
-    [Authorize] 
+    [Authorize]
     public class GameHub : Hub<IGameClient>
     {
         private readonly MatchmakingService _matchmaker;
+        private readonly PlayerConnectionTracker _tracker;
+        private readonly GameStateManager _gameStateManager;
 
-        public GameHub(MatchmakingService matchmaker)
+        public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager)
         {
             _matchmaker = matchmaker;
+            _tracker = tracker;
+            _gameStateManager = gameStateManager;
+        }
+
+        public override async Task OnConnectedAsync()
+        {
+            var playerId = Context.UserIdentifier;
+            if (playerId != null)
+            {
+                _tracker.AddConnection(Context.ConnectionId, playerId);
+                
+                // Check if this player is reconnecting to an active match
+                var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+                if (matchId != null)
+                {
+                    var match = _gameStateManager.GetMatch(matchId);
+                    if (match != null)
+                    {
+                        // Re-add the new connection to the SignalR Group
+                        await Groups.AddToGroupAsync(Context.ConnectionId, matchId);
+                        
+                        // Update game state
+                        if (match.Players.TryGetValue(playerId, out var playerState))
+                        {
+                            playerState.IsConnected = true;
+                            playerState.DisconnectedAt = null;
+                        }
+                        
+                        await Clients.Group(matchId).ReceiveSystemMessage($"Player {playerId[..5]} reconnected.");
+                    }
+                }
+            }
+            
+            var username = Context.User?.Identity?.Name ?? "Unknown";
+            Console.WriteLine($"[SignalR] Player Connected: {username} ({Context.ConnectionId})");
+            await base.OnConnectedAsync();
+        }
+
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            var playerId = _tracker.RemoveConnection(Context.ConnectionId);
+            
+            if (playerId != null)
+            {
+                var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+                if (matchId != null)
+                {
+                    var match = _gameStateManager.GetMatch(matchId);
+                    if (match != null && match.Players.TryGetValue(playerId, out var playerState))
+                    {
+                        // Mark as disconnected, but don't destroy the match yet
+                        playerState.IsConnected = false;
+                        playerState.DisconnectedAt = DateTime.UtcNow;
+                        
+                        await Clients.Group(matchId).ReceiveSystemMessage($"Player {playerId[..5]} disconnected. Waiting for reconnect...");
+                    }
+                }
+            }
+            
+            Console.WriteLine($"[SignalR] Player Disconnected: {Context.ConnectionId}");
+            await base.OnDisconnectedAsync(exception);
         }
 
         // Client calls this to queue for a match
@@ -39,20 +101,6 @@ namespace Nebula.Server.Hubs
         {
             var playerId = Context.UserIdentifier;
             // TODO in Phase 15: Add action to the game loop queue
-        }
-
-        public override async Task OnConnectedAsync()
-        {
-            // Log when a player connects to the socket
-            var username = Context.User?.Identity?.Name ?? "Unknown";
-            Console.WriteLine($"[SignalR] Player Connected: {username} ({Context.ConnectionId})");
-            await base.OnConnectedAsync();
-        }
-
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            Console.WriteLine($"[SignalR] Player Disconnected: {Context.ConnectionId}");
-            await base.OnDisconnectedAsync(exception);
         }
     }
 }

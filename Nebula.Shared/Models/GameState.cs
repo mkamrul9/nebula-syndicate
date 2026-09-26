@@ -28,5 +28,7 @@ namespace Nebula.Shared.Models
         public int Ironium { get; set; } // Example Resource
         public int ActiveDrones { get; set; }
         public bool IsEmpMuted { get; set; } // Status effect
+        public bool IsConnected { get; set; } = true;
+        public DateTime? DisconnectedAt { get; set; } 
     }
 }
