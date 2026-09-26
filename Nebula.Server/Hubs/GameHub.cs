@@ -140,7 +140,21 @@ namespace Nebula.Server.Hubs
         public async Task DispatchDrone(string targetNodeId)
         {
             var playerId = Context.UserIdentifier;
-            // TODO in Phase 15: Add action to the game loop queue
+            if (string.IsNullOrEmpty(playerId)) return;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            if (match == null) return;
+
+            // We do NOT deduct credits here. We just queue the intent.
+            match.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.DeployDrone,
+                TargetResource = targetNodeId
+            });
         }
     }
 }

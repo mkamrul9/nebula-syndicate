@@ -20,6 +20,12 @@ namespace Nebula.Shared.Models
 
         // The "Default" price the market wants to return to when left alone
         public Dictionary<string, decimal> BasePrices { get; set; } = new();
+
+        // This queue holds actions waiting for the next tick
+        // We use System.Text.Json.Serialization.JsonIgnore
+        // to prevent this from being serialized and sent to the client!
+        [System.Text.Json.Serialization.JsonIgnore] 
+        public System.Collections.Concurrent.ConcurrentQueue<PlayerAction> PendingActions { get; set; } = new();
     }
 
     public enum GameStatus

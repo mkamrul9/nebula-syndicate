@@ -39,6 +39,34 @@ namespace Nebula.Server.Services
 
                     state.CurrentTick++;
 
+                    // 1. PROCESS ACTION QUEUE
+                    // Drain the queue of all actions that came in during the last 100ms
+                    while (state.PendingActions.TryDequeue(out var action))
+                    {
+                        if (!state.Players.TryGetValue(action.PlayerId, out var player)) continue;
+
+                        if (action.Type == ActionType.DeployDrone)
+                        {
+                            const decimal DroneCost = 500.0m; // Hardcoded for now
+
+                            // Check exact balance at the moment of execution
+                            if (player.Credits >= DroneCost)
+                            {
+                                player.Credits -= DroneCost;
+
+                                if (action.TargetResource == "Ironium")
+                                {
+                                    player.ActiveIroniumDrones++;
+                                }
+                                else if (action.TargetResource == "Plasma")
+                                {
+                                    player.ActivePlasmaDrones++;
+                                }
+                            }
+                        }
+                        // ... logic for SellResource and UseSabotage will go here later
+                    }
+
                     // Define our base rates (e.g., per second)
                     const double IroniumPerDronePerSec = 2.0;
                     const double PlasmaPerDronePerSec = 0.5;
