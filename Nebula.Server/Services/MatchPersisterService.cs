@@ -5,6 +5,7 @@ using Nebula.Server.Data;
 using Nebula.Domain.Entities;
 using StackExchange.Redis;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.FeatureManagement;
 
 namespace Nebula.Server.Services
 {
@@ -13,10 +14,12 @@ namespace Nebula.Server.Services
         // A thread-safe queue for finished matches
         private readonly Channel<GameState> _channel = Channel.CreateUnbounded<GameState>();
         private readonly IServiceProvider _serviceProvider;
+        private readonly IFeatureManager _featureManager;
 
-        public MatchPersisterService(IServiceProvider serviceProvider)
+        public MatchPersisterService(IServiceProvider serviceProvider, IFeatureManager featureManager)
         {
             _serviceProvider = serviceProvider;
+            _featureManager = featureManager;
         }
 
         // The fast GameTickService calls this to offload the DB work
@@ -62,7 +65,19 @@ namespace Nebula.Server.Services
                     if (profile != null)
                     {
                         profile.TotalMatchesPlayed++;
-                        if (playerIdStr == winnerId) profile.TotalWins++;
+                        if (playerIdStr == winnerId) 
+                        {
+                            profile.TotalWins++;
+                            
+                            var baseReward = 100;
+                            if (await _featureManager.IsEnabledAsync("DoubleXPWeekend"))
+                            {
+                                baseReward *= 2;
+                            }
+                            
+                            // Grant reward to player... (e.g. XP or Credits)
+                            profile.PremiumCredits += baseReward;
+                        }
                     }
 
                     // Fetch active (unexpired) quests for this player

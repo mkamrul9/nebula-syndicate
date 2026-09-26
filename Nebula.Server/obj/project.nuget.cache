@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "O4nZnVplwf8=",
+  "dgSpecHash": "acNloTJpXvM=",
   "success": true,
   "projectFilePath": "D:\\SWE\\UNIQUE WORK\\.NET_game\\Nebula.Server\\Nebula.Server.csproj",
   "expectedPackageFiles": [
@@ -27,7 +27,7 @@
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.caching.memory\\8.0.1\\microsoft.extensions.caching.memory.8.0.1.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.configuration\\8.0.0\\microsoft.extensions.configuration.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\8.0.0\\microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512",
-    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.configuration.binder\\8.0.0\\microsoft.extensions.configuration.binder.8.0.0.nupkg.sha512",
+    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.configuration.binder\\8.0.2\\microsoft.extensions.configuration.binder.8.0.2.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.configuration.environmentvariables\\8.0.0\\microsoft.extensions.configuration.environmentvariables.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\8.0.1\\microsoft.extensions.dependencyinjection.8.0.1.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.5\\microsoft.extensions.dependencyinjection.abstractions.10.0.5.nupkg.sha512",
@@ -41,6 +41,8 @@
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.options\\8.0.2\\microsoft.extensions.options.8.0.2.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.options.configurationextensions\\8.0.0\\microsoft.extensions.options.configurationextensions.8.0.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.extensions.primitives\\8.0.0\\microsoft.extensions.primitives.8.0.0.nupkg.sha512",
+    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.featuremanagement\\4.8.0\\microsoft.featuremanagement.4.8.0.nupkg.sha512",
+    "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.featuremanagement.aspnetcore\\4.8.0\\microsoft.featuremanagement.aspnetcore.4.8.0.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.identitymodel.abstractions\\7.7.3\\microsoft.identitymodel.abstractions.7.7.3.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.identitymodel.jsonwebtokens\\7.7.3\\microsoft.identitymodel.jsonwebtokens.7.7.3.nupkg.sha512",
     "C:\\Users\\Lenovo\\.nuget\\packages\\microsoft.identitymodel.logging\\7.7.3\\microsoft.identitymodel.logging.7.7.3.nupkg.sha512",

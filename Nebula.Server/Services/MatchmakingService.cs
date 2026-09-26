@@ -11,6 +11,7 @@ namespace Nebula.Server.Services
     {
         private readonly IHubContext<GameHub, IGameClient> _hubContext;
         private readonly ConcurrentQueue<QueuedPlayer> _queue = new();
+        private bool _isAcceptingNewMatches = true;
         
         // We need 2 players for a 1v1 match
         private const int PlayersRequired = 2; 
@@ -21,17 +22,39 @@ namespace Nebula.Server.Services
         public MatchmakingService(
             IHubContext<GameHub, IGameClient> hubContext, 
             GameStateManager gameStateManager,
-            PlayerConnectionTracker tracker)
+            PlayerConnectionTracker tracker,
+            IHostApplicationLifetime appLifetime)
         {
             _hubContext = hubContext;
             _gameStateManager = gameStateManager;
             _tracker = tracker;
+
+            // Intercept the server shutdown signal (e.g., from Kubernetes/Azure)
+            appLifetime.ApplicationStopping.Register(() =>
+            {
+                Console.WriteLine("[LiveOps] Shutdown signal received. Draining server...");
+                
+                // Instantly stop accepting new players into this node's queue
+                _isAcceptingNewMatches = false;
+            });
+        }
+
+        // The background worker needs to know when it is safe to finally exit
+        public bool IsReadyToShutdown()
+        {
+            return !_isAcceptingNewMatches && _gameStateManager.GetActiveMatchCount() == 0;
         }
 
         // The Hub calls this method to add players
-        public void EnqueuePlayer(QueuedPlayer player)
+        public bool TryEnqueuePlayer(QueuedPlayer player)
         {
+            if (!_isAcceptingNewMatches)
+            {
+                return false;
+            }
+
             _queue.Enqueue(player);
+            return true;
         }
 
         // This runs continuously in the background

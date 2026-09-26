@@ -12,6 +12,7 @@ using StackExchange.Redis;
 using Stripe;
 using Stripe.Checkout;
 using OpenTelemetry.Metrics;
+using Microsoft.FeatureManagement;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -127,6 +128,8 @@ builder.Services.AddHostedService<GameTickService>();
 
 // Add PremiumCurrencyService
 builder.Services.AddScoped<PremiumCurrencyService>();
+
+builder.Services.AddFeatureManagement(builder.Configuration.GetSection("FeatureFlags"));
 
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
@@ -550,6 +553,20 @@ app.MapHub<Nebula.Server.Hubs.GameHub>("/gamehub");
 
 // Map the scraping endpoint (Prometheus will hit this route)
 app.MapPrometheusScrapingEndpoint("/metrics"); 
+
+var appLifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+var matchmakingService = app.Services.GetRequiredService<MatchmakingService>();
+
+appLifetime.ApplicationStopping.Register(() =>
+{
+    // Block the thread until the node is empty (max wait 15 minutes to prevent infinite hangs)
+    var timeout = DateTime.UtcNow.AddMinutes(15);
+    while (!matchmakingService.IsReadyToShutdown() && DateTime.UtcNow < timeout)
+    {
+        Thread.Sleep(5000); // Check every 5 seconds
+        Console.WriteLine("[LiveOps] Waiting for active matches to finish before shutting down...");
+    }
+});
 
 app.Run();
 

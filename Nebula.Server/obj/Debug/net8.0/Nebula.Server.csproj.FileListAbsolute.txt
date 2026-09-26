@@ -142,3 +142,6 @@ D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Api.Pr
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Exporter.Prometheus.AspNetCore.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Extensions.Hosting.dll
 D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\OpenTelemetry.Instrumentation.AspNetCore.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.Extensions.Configuration.Binder.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.FeatureManagement.dll
+D:\SWE\UNIQUE WORK\.NET_game\Nebula.Server\bin\Debug\net8.0\Microsoft.FeatureManagement.AspNetCore.dll

@@ -132,11 +132,19 @@ namespace Nebula.Server.Hubs
             var playerId = Context.UserIdentifier ?? "Guest"; 
             var connectionId = Context.ConnectionId;
 
-            _matchmaker.EnqueuePlayer(new QueuedPlayer
+            var success = _matchmaker.TryEnqueuePlayer(new QueuedPlayer
             {
                 PlayerId = playerId,
                 ConnectionId = connectionId
             });
+            
+            if (!success)
+            {
+                // Instruct the client to reconnect, load balancer will pick up the new v2 server
+                await Clients.Caller.ReceiveSystemMessage("Server is shutting down for an update. Please reconnect.");
+                Context.Abort();
+                return;
+            }
             
             await Clients.Caller.ReceiveSystemMessage("Entered matchmaking queue. Searching for rivals...");
         }

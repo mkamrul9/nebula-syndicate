@@ -58,6 +58,11 @@ namespace Nebula.Server.Services
             return _activeGames.Values;
         }
 
+        public int GetActiveMatchCount()
+        {
+            return _activeGames.Count;
+        }
+
         public void EndMatch(string matchId)
         {
             if (_activeGames.TryRemove(matchId, out _))

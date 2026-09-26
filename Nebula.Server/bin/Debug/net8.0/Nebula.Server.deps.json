@@ -13,6 +13,7 @@
           "Microsoft.AspNetCore.OpenApi": "8.0.30",
           "Microsoft.AspNetCore.SignalR.StackExchangeRedis": "8.0.8",
           "Microsoft.EntityFrameworkCore.Design": "8.0.31",
+          "Microsoft.FeatureManagement.AspNetCore": "4.8.0",
           "Nebula.Domain": "1.0.0",
           "Nebula.Shared": "1.0.0",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "8.0.11",
@@ -410,9 +411,15 @@
           "Microsoft.Extensions.Primitives": "8.0.0"
         }
       },
-      "Microsoft.Extensions.Configuration.Binder/8.0.0": {
+      "Microsoft.Extensions.Configuration.Binder/8.0.2": {
         "dependencies": {
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Extensions.Configuration.Binder.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.724.31311"
+          }
         }
       },
       "Microsoft.Extensions.Configuration.EnvironmentVariables/8.0.0": {
@@ -498,7 +505,7 @@
         "dependencies": {
           "Microsoft.Extensions.Configuration": "8.0.0",
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.Binder": "8.0.0",
+          "Microsoft.Extensions.Configuration.Binder": "8.0.2",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.5",
           "Microsoft.Extensions.Logging": "8.0.1",
           "Microsoft.Extensions.Logging.Abstractions": "10.0.5",
@@ -521,13 +528,38 @@
       "Microsoft.Extensions.Options.ConfigurationExtensions/8.0.0": {
         "dependencies": {
           "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.Binder": "8.0.0",
+          "Microsoft.Extensions.Configuration.Binder": "8.0.2",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.5",
           "Microsoft.Extensions.Options": "8.0.2",
           "Microsoft.Extensions.Primitives": "8.0.0"
         }
       },
       "Microsoft.Extensions.Primitives/8.0.0": {},
+      "Microsoft.FeatureManagement/4.8.0": {
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Memory": "8.0.1",
+          "Microsoft.Extensions.Configuration": "8.0.0",
+          "Microsoft.Extensions.Configuration.Binder": "8.0.2",
+          "Microsoft.Extensions.Logging": "8.0.1"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.FeatureManagement.dll": {
+            "assemblyVersion": "4.8.0.0",
+            "fileVersion": "4.8.0.0"
+          }
+        }
+      },
+      "Microsoft.FeatureManagement.AspNetCore/4.8.0": {
+        "dependencies": {
+          "Microsoft.FeatureManagement": "4.8.0"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.FeatureManagement.AspNetCore.dll": {
+            "assemblyVersion": "4.8.0.0",
+            "fileVersion": "4.8.0.0"
+          }
+        }
+      },
       "Microsoft.IdentityModel.Abstractions/7.7.3": {
         "runtime": {
           "lib/net8.0/Microsoft.IdentityModel.Abstractions.dll": {
@@ -1130,12 +1162,12 @@
       "path": "microsoft.extensions.configuration.abstractions/8.0.0",
       "hashPath": "microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512"
     },
-    "Microsoft.Extensions.Configuration.Binder/8.0.0": {
+    "Microsoft.Extensions.Configuration.Binder/8.0.2": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-mBMoXLsr5s1y2zOHWmKsE9veDcx8h1x/c3rz4baEdQKTeDcmQAPNbB54Pi/lhFO3K431eEq6PFbMgLaa6PHFfA==",
-      "path": "microsoft.extensions.configuration.binder/8.0.0",
-      "hashPath": "microsoft.extensions.configuration.binder.8.0.0.nupkg.sha512"
+      "sha512": "sha512-7IQhGK+wjyGrNsPBjJcZwWAr+Wf6D4+TwOptUt77bWtgNkiV8tDEbhFS+dDamtQFZ2X7kWG9m71iZQRj2x3zgQ==",
+      "path": "microsoft.extensions.configuration.binder/8.0.2",
+      "hashPath": "microsoft.extensions.configuration.binder.8.0.2.nupkg.sha512"
     },
     "Microsoft.Extensions.Configuration.EnvironmentVariables/8.0.0": {
       "type": "package",
@@ -1227,6 +1259,20 @@
       "sha512": "sha512-bXJEZrW9ny8vjMF1JV253WeLhpEVzFo1lyaZu1vQ4ZxWUlVvknZ/+ftFgVheLubb4eZPSwwxBeqS1JkCOjxd8g==",
       "path": "microsoft.extensions.primitives/8.0.0",
       "hashPath": "microsoft.extensions.primitives.8.0.0.nupkg.sha512"
+    },
+    "Microsoft.FeatureManagement/4.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-p1dzpXano+DTet2/hQGb+J91QonETabPYmO5BdqpsWOPq2C3WsWbm1BICTNlWqL81EVGrRrjpQh9mRNX55ZKmQ==",
+      "path": "microsoft.featuremanagement/4.8.0",
+      "hashPath": "microsoft.featuremanagement.4.8.0.nupkg.sha512"
+    },
+    "Microsoft.FeatureManagement.AspNetCore/4.8.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-LBKVCjgNvJYtIiKb1IoXyuyzpZPmfVxnlDB0ByZ774EB1hNQLQlMQ9juZpJ3fRgEYodYs7aa7WKVvWshHx1CbQ==",
+      "path": "microsoft.featuremanagement.aspnetcore/4.8.0",
+      "hashPath": "microsoft.featuremanagement.aspnetcore.4.8.0.nupkg.sha512"
     },
     "Microsoft.IdentityModel.Abstractions/7.7.3": {
       "type": "package",
