@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Nebula.BotSwarm")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f92bef6dd0f597d1fbc92324643c3b31a0537d0c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25759574d2c3c15419de275d63cc599f772a1996")]
 [assembly: System.Reflection.AssemblyProductAttribute("Nebula.BotSwarm")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Nebula.BotSwarm")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -14,6 +14,9 @@ namespace Nebula.Shared.Interfaces
         // Notifies the client that they successfully joined a match
         Task MatchJoined(string matchId);
         
+        // New method to receive region
+        Task AcknowledgeRegion(string regionName);
+        
         // New method for structured chat
         Task ReceiveChatMessage(ChatMessage message); 
         

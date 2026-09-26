@@ -12,7 +12,7 @@ namespace Nebula.Server.Services
     public class MatchmakingService : BackgroundService
     {
         private readonly IHubContext<GameHub, IGameClient> _hubContext;
-        private readonly ConcurrentQueue<QueuedPlayer> _queue = new();
+        private readonly ConcurrentDictionary<string, ConcurrentQueue<QueuedPlayer>> _regionalQueues = new();
         private bool _isAcceptingNewMatches = true;
         
         // We need 2 players for a 1v1 match
@@ -48,14 +48,15 @@ namespace Nebula.Server.Services
         }
 
         // The Hub calls this method to add players
-        public bool TryEnqueuePlayer(QueuedPlayer player)
+        public bool TryEnqueuePlayer(QueuedPlayer player, string region)
         {
             if (!_isAcceptingNewMatches)
             {
                 return false;
             }
 
-            _queue.Enqueue(player);
+            var queue = _regionalQueues.GetOrAdd(region, _ => new ConcurrentQueue<QueuedPlayer>());
+            queue.Enqueue(player);
             return true;
         }
 
@@ -64,17 +65,20 @@ namespace Nebula.Server.Services
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (_queue.Count >= PlayersRequired)
+                foreach (var (region, queue) in _regionalQueues)
                 {
-                    await TryCreateMatch();
-                }
-                else if (_queue.Count == 1) // Only one player waiting
-                {
-                    if (_queue.TryPeek(out var player))
+                    if (queue.Count >= PlayersRequired)
                     {
-                        if ((DateTime.UtcNow - player.JoinedAt).TotalSeconds > 60)
+                        await TryCreateMatch(queue, region);
+                    }
+                    else if (queue.Count == 1) // Only one player waiting
+                    {
+                        if (queue.TryPeek(out var player))
                         {
-                            await TryCreateBotMatch();
+                            if ((DateTime.UtcNow - player.JoinedAt).TotalSeconds > 60)
+                            {
+                                await TryCreateBotMatch(queue, region);
+                            }
                         }
                     }
                 }
@@ -84,12 +88,12 @@ namespace Nebula.Server.Services
             }
         }
 
-        private async Task TryCreateMatch()
+        private async Task TryCreateMatch(ConcurrentQueue<QueuedPlayer> queue, string region)
         {
             var matchedPlayers = new List<QueuedPlayer>();
 
             // Try to dequeue the required number of players
-            while (matchedPlayers.Count < PlayersRequired && _queue.TryDequeue(out var player))
+            while (matchedPlayers.Count < PlayersRequired && queue.TryDequeue(out var player))
             {
                 matchedPlayers.Add(player);
             }
@@ -123,18 +127,18 @@ namespace Nebula.Server.Services
                 // If we didn't get enough players (e.g., someone dequeued), put them back
                 foreach (var p in matchedPlayers)
                 {
-                    _queue.Enqueue(p);
+                    queue.Enqueue(p);
                 }
             }
         }
 
-        private async Task TryCreateBotMatch()
+        private async Task TryCreateBotMatch(ConcurrentQueue<QueuedPlayer> queue, string region)
         {
-            if (_queue.TryDequeue(out var human))
+            if (queue.TryDequeue(out var human))
             {
                 var matchId = Guid.NewGuid().ToString();
-                var queue = new ConcurrentQueue<PlayerAction>();
-                var bot = new AiBotController(queue);
+                var actionQueue = new ConcurrentQueue<PlayerAction>();
+                var bot = new AiBotController(actionQueue);
 
                 Console.WriteLine($"[Matchmaker] Player {human.PlayerId} timed out. Provisioning AI Bot Match {matchId}.");
 
@@ -151,7 +155,7 @@ namespace Nebula.Server.Services
                 if (state != null)
                 {
                     state.ActiveBot = bot;
-                    state.PendingActions = queue;
+                    state.PendingActions = actionQueue;
                     state.Players[human.PlayerId].PlayerName = "Human Extractor";
                     state.Players[bot.BotId].PlayerName = "Syndicate AI";
                 }

@@ -18,6 +18,9 @@ namespace Nebula.Client.Services
         public event Action<string>? OnMatchJoined;
         public event Action<NotificationPayload>? OnGlobalNotificationReceived;
         
+        public string CurrentRegion { get; private set; } = "Unknown";
+        public event Action? OnStateChanged;
+        
         public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
 
         public GameConnectionManager(ILocalStorageService localStorage)
@@ -59,6 +62,13 @@ namespace Nebula.Client.Services
             _hubConnection.On<NotificationPayload>(nameof(IGameClient.ReceiveGlobalNotification), (payload) =>
             {
                 OnGlobalNotificationReceived?.Invoke(payload);
+            });
+
+            _hubConnection.On<string>(nameof(IGameClient.AcknowledgeRegion), (regionName) =>
+            {
+                Console.WriteLine($"[Network] Connected to Edge Node in: {regionName}");
+                CurrentRegion = regionName;
+                OnStateChanged?.Invoke();
             });
         }
 

@@ -141,6 +141,14 @@
       "url": "_framework\/Microsoft.Extensions.FileSystemGlobbing.wasm"
     },
     {
+      "hash": "sha256-WY8wzDYpbOl8wspMlvRknbN\/lqHg9753iaOQ7V6946A=",
+      "url": "_framework\/Microsoft.Extensions.Localization.wasm"
+    },
+    {
+      "hash": "sha256-nyx\/rfgAQdcrcEUL+33sVVotG+tqnvT6p2hMBzLU0Us=",
+      "url": "_framework\/Microsoft.Extensions.Localization.Abstractions.wasm"
+    },
+    {
       "hash": "sha256-pa0M3exxNvk6g5anUwlaPC99Afawsi1GZvJeU1q\/ZGM=",
       "url": "_framework\/Microsoft.Extensions.Logging.wasm"
     },
@@ -877,37 +885,29 @@
       "url": "_framework\/icudt_no_CJK.dat"
     },
     {
-      "hash": "sha256-pf90PtEoeNMb4Z0t0PGbJIgXIjV\/E\/H3MQgix\/Wm6Fs=",
+      "hash": "sha256-vbB9Gjg+Bo2X1VW0e\/Uvj6\/O92rJivXpaB+j0R1u9OQ=",
       "url": "_framework\/Nebula.Shared.wasm"
     },
     {
-      "hash": "sha256-goOS0XfEBi5OvEZaItR5QWBX4WQI+DhB97JGrqa6hGA=",
+      "hash": "sha256-rcRzeaRi\/G0v9\/ZQkZ1F2PKWT54NdiyGDaYiTX4ibx0=",
       "url": "_framework\/Nebula.Shared.pdb"
     },
     {
-      "hash": "sha256-oE8NB368r1kjH3ZvdLShf3rv3914OLBTC6Jrz3wJ+GM=",
+      "hash": "sha256-9zbGWCPadShJCqR\/rI4o\/+iaizDhCbgE9xmq+oLGUw4=",
       "url": "_framework\/Nebula.Client.wasm"
     },
     {
-      "hash": "sha256-a4roQmKPReUU1oeuPvT3DglM4GiF5oS4bHqkXHehTSo=",
+      "hash": "sha256-tGIZnZi+o0PE06nkxj6d\/Iz\/6TBet0szNMaelU3HY\/0=",
       "url": "_framework\/Nebula.Client.pdb"
-    },
-    {
-      "hash": "sha256-d04hkro\/T0+PzHyjaJedgQtFb\/aigs8mNXdVCPh76Yw=",
-      "url": "_framework\/blazor.boot.json"
-    },
-    {
-      "hash": "sha256-WY8wzDYpbOl8wspMlvRknbN\/lqHg9753iaOQ7V6946A=",
-      "url": "_framework\/Microsoft.Extensions.Localization.wasm"
-    },
-    {
-      "hash": "sha256-nyx\/rfgAQdcrcEUL+33sVVotG+tqnvT6p2hMBzLU0Us=",
-      "url": "_framework\/Microsoft.Extensions.Localization.Abstractions.wasm"
     },
     {
       "hash": "sha256-2C+NeVmte94f6AyYPm3+Ig8Z8o3daVie59jP85NrAtg=",
       "url": "_framework\/es\/Nebula.Client.resources.wasm"
+    },
+    {
+      "hash": "sha256-wE7hUaME\/yS4mB4lz7T8RpkV0MnmjtY4fm7nVpdtH6g=",
+      "url": "_framework\/blazor.boot.json"
     }
   ],
-  "version": "kZXto8Oo"
+  "version": "zGYuSjz+"
 };

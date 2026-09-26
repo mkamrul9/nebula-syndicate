@@ -15,21 +15,25 @@ namespace Nebula.Server.Hubs
         private readonly MatchmakingService _matchmaker;
         private readonly PlayerConnectionTracker _tracker;
         private readonly GameStateManager _gameStateManager;
+        private readonly string _serverRegion;
 
         private const string GlobalChannel = "Global";
 
         // Tracks the last action time for rate limiting (ConnectionId -> Timestamp)
         private static readonly ConcurrentDictionary<string, DateTime> _lastActionTimes = new();
 
-        public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager)
+        public GameHub(MatchmakingService matchmaker, PlayerConnectionTracker tracker, GameStateManager gameStateManager, IConfiguration config)
         {
             _matchmaker = matchmaker;
             _tracker = tracker;
             _gameStateManager = gameStateManager;
+            _serverRegion = config["SERVER_REGION"] ?? "Local-Dev";
         }
 
         public override async Task OnConnectedAsync()
         {
+            await Clients.Caller.AcknowledgeRegion(_serverRegion);
+            
             var playerId = Context.UserIdentifier;
             
             // Add everyone to the Global chat group by default
@@ -136,7 +140,7 @@ namespace Nebula.Server.Hubs
             {
                 PlayerId = playerId,
                 ConnectionId = connectionId
-            });
+            }, _serverRegion);
             
             if (!success)
             {
