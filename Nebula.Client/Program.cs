@@ -3,34 +3,34 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Nebula.Client;
 using Nebula.Client.Services;
 using Blazored.LocalStorage;
-using Microsoft.JSInterop;
 using System.Globalization;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Register HTTP Client for API calls (like login)
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+var apiBase = builder.Configuration["ApiBaseUrl"];
+if (string.IsNullOrWhiteSpace(apiBase))
+    apiBase = "http://localhost:5168/";
+if (!apiBase.EndsWith('/'))
+    apiBase += "/";
 
 // Register LocalStorage and our Custom Connection Manager
 builder.Services.AddBlazoredLocalStorage();
+builder.Services.AddScoped<AuthHeaderHandler>();
+builder.Services.AddScoped(sp =>
+{
+    var handler = sp.GetRequiredService<AuthHeaderHandler>();
+    // WASM must use the browser fetch pipeline. A bare HttpClientHandler can hang the boot loader.
+    handler.InnerHandler = new HttpClientHandler();
+    return new HttpClient(handler) { BaseAddress = new Uri(apiBase) };
+});
 builder.Services.AddScoped<GameConnectionManager>();
 
-// 1. Register Localization Services
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
-var host = builder.Build();
+// Do not call IJSRuntime before RunAsync. That waits forever and leaves the splash at 99%.
+CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
-// 2. Read the user's saved language preference via JS Interop before rendering UI
-var jsInterop = host.Services.GetRequiredService<IJSRuntime>();
-var result = await jsInterop.InvokeAsync<string>("localStorage.getItem", "preferredLanguage");
-
-// 3. Apply the Culture
-var cultureName = !string.IsNullOrWhiteSpace(result) ? result : "en-US";
-var culture = new CultureInfo(cultureName);
-
-CultureInfo.DefaultThreadCurrentCulture = culture;
-CultureInfo.DefaultThreadCurrentUICulture = culture;
-
-await host.RunAsync();
+await builder.Build().RunAsync();

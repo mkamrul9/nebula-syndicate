@@ -6,7 +6,10 @@ namespace Nebula.Shared.Models
         DeployDrone,
         SellResource,
         UseSabotage,
-        BuildDefense
+        BuildDefense,
+        DroneOvercharge,
+        ActivatePowerSurge,   // x3 drone boost for 10s — costs ₡4000
+        EmergencySell         // Panic sell-all at current prices
     }
 
     public enum SabotageType
@@ -27,6 +30,9 @@ namespace Nebula.Shared.Models
         
         // For Drone/Market actions
         public string TargetResource { get; init; }
+
+        // Units to sell. Ignored for other action types. The server clamps this to the stockpile.
+        public double Amount { get; init; }
         
         // For Sabotage actions
         public string TargetPlayerId { get; init; }

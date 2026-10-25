@@ -1,76 +1,211 @@
 @* File: Nebula.Client/Pages/Lobby.razor *@
 @page "/lobby"
 @using Nebula.Client.Services
+@using Nebula.Shared.Models
 @implements IDisposable
 @inject GameConnectionManager GameManager
 @inject NavigationManager NavManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
-<div class="container mt-5">
-    <div class="row">
-        <div class="col-md-8 text-center">
-            <h1 class="display-4 text-warning">NEBULA SYNDICATE</h1>
-            <p class="lead">Corporate Extractor Terminal</p>
+<div class="nebula-page">
+    <div class="row g-4 align-items-start">
+        <div class="col-lg-8">
+            <p class="eyebrow">Live extraction</p>
+            <h1 class="display-5">Race a rival to ₡@GameState.VictoryLine.ToString("N0")</h1>
+            <p class="lead text-muted">Deploy drones, sell when the market spikes, and EMP the leader. The first syndicate across the line wins.</p>
 
-            <div class="card bg-dark text-light border-secondary mt-4 p-5">
-                @if (!GameManager.IsConnected)
+            <div class="row g-3 my-3">
+                <div class="col-md-4">
+                    <div class="tip-card">
+                        <div class="eyebrow">1</div>
+                        <h5>Build</h5>
+                        <p>Iron drones are the volume. Plasma pays more per unit. Both cost ₡500.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="tip-card">
+                        <div class="eyebrow">2</div>
+                        <h5>Time the sale</h5>
+                        <p>A hot quote pays an extra 8%. A glut means hold. Shocks hit every 20 seconds.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="tip-card">
+                        <div class="eyebrow">3</div>
+                        <h5>Deny them</h5>
+                        <p>An EMP freezes their drones for 10 seconds. Firewalls absorb one shot.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-4 p-md-5 text-center">
+                @if (!string.IsNullOrEmpty(_error))
                 {
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <h4 class="mt-3">Establishing Uplink to Syndicate Servers...</h4>
+                    <div class="alert alert-danger">@_error</div>
+                    <button class="btn btn-outline-warning" @onclick="Connect">Retry uplink</button>
+                }
+                else if (!GameManager.IsConnected)
+                {
+                    <div class="spinner-border text-info" role="status"></div>
+                    <h4 class="mt-3">Connecting to the syndicate…</h4>
                 }
                 else if (_isQueued)
                 {
                     <div class="spinner-grow text-danger" role="status"></div>
-                    <h4 class="mt-3 text-danger">Searching for Rivals...</h4>
-                    <p class="text-muted">Stay on this frequency. Deployment is imminent.</p>
+                    <h4 class="mt-3">@(_startingTutorial ? "Opening guided match…" : "Finding a rival")</h4>
+                    <p class="text-muted mb-0">Stay on this page. Deployment is imminent.</p>
                 }
                 else
                 {
-                    <h4 class="text-success mb-4">Uplink Established. Ready for deployment.</h4>
-                    <button class="btn btn-danger btn-lg px-5 py-3 fw-bold" @onclick="JoinQueue">
-                        ENTER MATCHMAKING
-                    </button>
+                    <h4 class="mb-3">You are clear to deploy.</h4>
+                    @if (_showGuidedCta)
+                    {
+                        <p class="text-muted mb-4">New commanders should win a guided match first. Soft rival, live coach on every panel.</p>
+                        <div class="d-flex gap-2 justify-content-center flex-wrap">
+                            <button class="btn btn-warning btn-lg px-5 py-3 fw-bold" @onclick="StartTutorial">
+                                Start guided first match
+                            </button>
+                            <button class="btn btn-outline-light btn-lg" @onclick="JoinQueue">
+                                Ranked matchmaking
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="d-flex gap-2 justify-content-center flex-wrap">
+                            <button class="btn btn-danger btn-lg px-5 py-3 fw-bold" @onclick="JoinQueue">
+                                Find a match
+                            </button>
+                            <button class="btn btn-outline-warning btn-lg" @onclick="StartTutorial">
+                                Guided match
+                            </button>
+                            <button class="btn btn-outline-light btn-lg" @onclick="OpenTutorial">
+                                Briefing
+                            </button>
+                        </div>
+                    }
                 }
             </div>
         </div>
 
-        <div class="col-md-4">
-            @* We reuse the Global Chat built in Phase 10 here *@
-            <GlobalChatWidget /> 
+        <div class="col-lg-4">
+            <GlobalChatWidget />
+            <a class="edition-link" href="howto">Full command primer</a>
+            <a class="edition-link" href="editions">Get Nebula on phone, desktop, or the web</a>
         </div>
     </div>
 </div>
 
+<HowToPlayTutorial @ref="_tutorial" AutoShow="true" />
+
 @code {
-    private bool _isQueued = false;
+    [SupplyParameterFromQuery(Name = "queue")]
+    public string? Queue { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tutorial")]
+    public string? Tutorial { get; set; }
+
+    private bool _isQueued;
+    private bool _startingTutorial;
+    private bool _showGuidedCta;
+    private string? _error;
+    private HowToPlayTutorial? _tutorial;
+
+    private string? _lastAutoAction;
 
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to state changes and routing events
         GameManager.OnMatchJoined += HandleMatchJoined;
-        
-        if (!GameManager.IsConnected)
+        var arenaDone = await LocalStorage.GetItemAsync<bool?>(ArenaCoach.StorageKey);
+        _showGuidedCta = arenaDone != true;
+        await Connect();
+        await TryAutoActionsAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await TryAutoActionsAsync();
+    }
+
+    private async Task TryAutoActionsAsync()
+    {
+        if (!string.IsNullOrEmpty(_error) || !GameManager.IsConnected || _isQueued)
+            return;
+
+        if (Tutorial == "1")
         {
-            await GameManager.ConnectAsync();
+            var key = $"tutorial:{Tutorial}";
+            if (_lastAutoAction == key) return;
+            _lastAutoAction = key;
+            await StartTutorial();
+            return;
+        }
+
+        if (Queue == "1")
+        {
+            var key = $"queue:{Queue}";
+            if (_lastAutoAction == key) return;
+            _lastAutoAction = key;
+            await JoinQueue();
+        }
+    }
+
+    private void OpenTutorial() => _tutorial?.Open();
+
+    private async Task Connect()
+    {
+        _error = null;
+        try
+        {
+            if (!GameManager.IsConnected)
+                await GameManager.ConnectAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not reach the syndicate servers. {ex.Message}";
         }
     }
 
     private async Task JoinQueue()
     {
+        _error = null;
+        _startingTutorial = false;
+        try
+        {
+            await GameManager.JoinMatchQueue();
+            _isQueued = true;
+        }
+        catch (Exception ex)
+        {
+            _isQueued = false;
+            _error = ex.Message;
+        }
+    }
+
+    private async Task StartTutorial()
+    {
+        _error = null;
+        _startingTutorial = true;
         _isQueued = true;
-        await GameManager.JoinMatchQueue();
+        try
+        {
+            await GameManager.StartTutorialMatchAsync();
+        }
+        catch (Exception ex)
+        {
+            _isQueued = false;
+            _startingTutorial = false;
+            _error = ex.Message;
+        }
     }
 
     private void HandleMatchJoined(string matchId)
     {
-        // The server found a match! Route the user to the game arena.
-        // We use InvokeAsync because SignalR events fire on a background thread,
-        // but NavigationManager must be called on the UI thread.
         InvokeAsync(() => NavManager.NavigateTo($"/arena/{matchId}"));
     }
 
     public void Dispose()
     {
-        // CRITICAL: Prevent memory leaks
         GameManager.OnMatchJoined -= HandleMatchJoined;
     }
 }

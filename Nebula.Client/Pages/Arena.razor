@@ -3,163 +3,333 @@
 @using Nebula.Client.Services
 @using Nebula.Client.Components
 @using Nebula.Shared.Models
+@using Microsoft.AspNetCore.Components.Web
 @implements IDisposable
-@using Microsoft.Extensions.Localization
-@inject IStringLocalizer<Nebula.Client.App> Loc
 @inject GameConnectionManager GameManager
 @inject NavigationManager NavManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject IJSRuntime JS
 
 @if (_latestState?.Status == GameStatus.Finished)
 {
-    <div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 1050;">
-        <div class="card bg-black border border-warning p-5 text-center shadow-lg" style="min-width: 400px;">
-            @if (_myState?.Credits >= 50000.0m)
+    var isWinner = _latestState?.WinnerId == _myPlayerId;
+    <div class="verdict-scrim @(isWinner ? "victory" : "defeat")">
+        @if (isWinner)
+        {
+            @for (int i = 0; i < 28; i++)
             {
-                <h1 class="text-success display-3 fw-bold mb-3">VICTORY</h1>
-                <p class="lead text-light">Extraction Rights Secured.</p>
+                var delay = (i * 0.11).ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "s";
+                var left = (i * 3.6 + 1).ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "%";
+                var dur = (2.2 + (i % 5) * 0.35).ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + "s";
+                var bg = i % 3 == 0 ? "var(--cyan)" : (i % 3 == 1 ? "var(--amber)" : "var(--magenta)");
+                <div class="confetti-particle" style="--confetti-x:@left; --fall-delay:@delay; --fall-duration:@dur; background-color:@bg;"></div>
+            }
+        }
+        <div class="verdict-card">
+            @if (isWinner)
+            {
+                <p class="eyebrow">@( _latestState?.IsTutorial == true ? "Training complete" : "Extraction rights secured")</p>
+                <h1 class="verdict-win">Victory</h1>
+                <p class="lead">@( _latestState?.IsTutorial == true
+                    ? "You mastered the timing, managed your stockpile, and took the line. Real rivals hit harder — same rules."
+                    : "You crossed the line first! Dominance verified. Queue again before they regroup.")</p>
             }
             else
             {
-                <h1 class="text-danger display-3 fw-bold mb-3">DEFEAT</h1>
-                <p class="lead text-light">Your syndicate has been liquidated.</p>
+                <p class="eyebrow">Syndicate liquidated</p>
+                <h1 class="verdict-loss">Defeat</h1>
+                <p class="lead">@( _latestState?.IsTutorial == true
+                    ? "The training rig beat you to the line. Replay the guided match from the lobby."
+                    : "They sold the spike and seized extraction. Adjust your timing and take the next match.")</p>
             }
-            <hr class="border-secondary" />
-            <h4 class="text-warning">Final Credits: ₡@Math.Floor(_myState?.Credits ?? 0)</h4>
-            
-            <button class="btn btn-outline-warning mt-4" @onclick='() => NavManager.NavigateTo("/lobby")'>
-                RETURN TO LOBBY
-            </button>
+            <h4 class="text-warning">Final credits ₡@Math.Floor(_myState?.Credits ?? 0).ToString("N0")</h4>
+            <div class="d-flex gap-2 justify-content-center mt-4 flex-wrap">
+                @if (_latestState?.IsTutorial == true && !isWinner)
+                {
+                    <button class="btn btn-warning btn-lg fw-bold" @onclick="ReplayTutorial">Replay guided match</button>
+                }
+                else
+                {
+                    <button class="btn btn-warning btn-lg fw-bold" @onclick="PlayAgain">Play again</button>
+                }
+                <button class="btn btn-outline-light" @onclick='() => NavManager.NavigateTo("/lobby")'>Lobby</button>
+            </div>
         </div>
     </div>
 }
 
 @if (_latestState == null)
 {
-    <div class="text-center mt-5">
-        <div class="spinner-border text-info" role="status"></div>
-        <h3 class="mt-3">Synchronizing telemetry with Arena...</h3>
+    <div class="text-center mt-5 nebula-page">
+        @if (!string.IsNullOrEmpty(_joinError))
+        {
+            <div class="alert alert-danger d-inline-block text-start">@_joinError</div>
+            <div class="mt-3">
+                <button class="btn btn-warning fw-bold" @onclick='() => NavManager.NavigateTo("/lobby")'>Back to lobby</button>
+            </div>
+        }
+        else
+        {
+            <div class="spinner-border text-info" role="status"></div>
+            <h3 class="mt-3">Synchronizing telemetry with Arena...</h3>
+            <p class="text-muted">Locking onto match @MatchId</p>
+        }
     </div>
 }
 else
 {
-    <div class="container-fluid bg-dark text-light min-vh-100 p-4">
-        <div class="row">
-            <!-- Left Column: Player Resources -->
-            <div class="col-md-3">
-                <div class="card bg-secondary text-white mb-3">
-                    <div class="card-header border-bottom border-info fw-bold">
-                        MY SYNDICATE
+    <div class="arena-shell @(_latestState.IsTutorial ? "tutorial-match" : null) @(_isEmpHit ? "emp-hit" : null)"
+         tabindex="0" @ref="_arenaShell" @onkeydown="HandleHotkey">
+        @if (_latestState.IsTutorial)
+        {
+            <div class="tutorial-match-banner">Guided match · soft rival · follow the coach to ₡50,000</div>
+        }
+
+        @if (_showMilestoneBanner)
+        {
+            <div class="milestone-banner">🌟 MILESTONE REACHED: ₡@_milestoneAmount.ToString("N0") / ₡@GameState.VictoryLine.ToString("N0")!</div>
+        }
+
+        <div class="race-board coach-target @HighlightClass("race") @(_showMilestoneBanner ? "milestone-hit" : null) @(_latestState.IsGlobalPowerSurge ? "surge-active" : null)">
+            <div class="d-flex justify-content-between align-items-end mb-2">
+                <div>
+                    <div class="eyebrow">Race to ₡@GameState.VictoryLine.ToString("N0")</div>
+                    <div class="race-lead">@LeadLine</div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    @if (_latestState.IsGlobalPowerSurge)
+                    {
+                        var surgeRemain = Math.Max(0, (_latestState.GlobalPowerSurgeUntilTick - _latestState.CurrentTick) / 10.0);
+                        <span class="global-surge-badge">⚡ GRID SURGE @surgeRemain.ToString("F0")s</span>
+                    }
+                    <div class="small text-muted">⏱ @MatchTimerDisplay · Tick @_latestState.CurrentTick</div>
+                </div>
+            </div>
+            <div class="race-row">
+                <span>You @Crown(_myPlayerId)</span>
+                <div class="race-track"><div class="race-fill mine @((_myState?.Credits ?? 0) >= 25000 ? "leading" : null)" style="width:@Pct(_myState?.Credits ?? 0)%"></div></div>
+                <span>₡@Math.Floor(_myState?.Credits ?? 0).ToString("N0")</span>
+            </div>
+            @foreach (var opp in _opponents)
+            {
+                <div class="race-row">
+                    <span>@opp.Value.PlayerName @Crown(opp.Key)</span>
+                    <div class="race-track"><div class="race-fill rival @(opp.Value.Credits >= 25000 ? "leading" : null)" style="width:@Pct(opp.Value.Credits)%"></div></div>
+                    <span>₡@Math.Floor(opp.Value.Credits).ToString("N0")</span>
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_latestState.MarketHeadline) && _latestState.CurrentTick < _latestState.MarketEventUntilTick)
+        {
+            var remainingTicks = _latestState.MarketEventUntilTick - _latestState.CurrentTick;
+            var remainingSec = Math.Max(0, remainingTicks / 10.0);
+            <div class="shock-banner">
+                @_latestState.MarketHeadline
+                <span class="shock-countdown">@remainingSec.ToString("F1")s</span>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(_matchAlertMessage))
+        {
+            <div class="match-alert-banner match-alert-@_matchAlertType">
+                @_matchAlertMessage
+            </div>
+        }
+
+        <div class="hotkey-bar" aria-label="Keyboard shortcuts">
+            <span><kbd>1</kbd>/<kbd>2</kbd> Deploy Fe/Pl</span>
+            <span><kbd>Q</kbd>/<kbd>W</kbd> Sell all Fe/Pl</span>
+            <span><kbd>F</kbd> Firewall</span>
+            <span><kbd>P</kbd> Power Surge</span>
+            <span><kbd>X</kbd> Emergency sell</span>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-3">
+                <div class="card mb-3 coach-target @HighlightClass("syndicate", "deploy", "sell", "defense")">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                        <span>Your syndicate</span>
+                        @if (_myState != null && _myState.FirewallCharges > 0)
+                        {
+                            <span class="badge bg-dark border border-info text-info firewall-count" title="Firewall Shield active">
+                                🛡️ @_myState.FirewallCharges
+                            </span>
+                        }
                     </div>
-                    <!-- Apply the EMP visual override dynamically -->
                     <div class="card-body @(_myState != null && _myState.IsEmpMuted ? "emp-overlay" : "")">
                         @if (_myState != null)
                         {
                             @if (_myState.IsEmpMuted)
                             {
-                                <!-- Calculate remaining seconds based on server ticks (assuming 10 ticks/sec) -->
                                 var remainingTicks = _myState.EmpExpirationTick - _latestState!.CurrentTick;
                                 var remainingSeconds = Math.Max(0, remainingTicks / 10.0);
-                                
+
                                 <div class="alert bg-dark border-danger glitch-text mb-3">
-                                    SYSTEMS OFFLINE<br />
+                                    ⚡ EMP ATTACK! SYSTEMS OFFLINE<br />
                                     REBOOTING IN: @remainingSeconds.ToString("F1")s
                                 </div>
                             }
 
-                            <h2 class="text-warning">₡ @Math.Floor(_myState.Credits)</h2>
-                            <hr />
-                            
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div>
-                                    <h5>Ironium <span class="badge bg-secondary">@_myState.ActiveIroniumDrones Active</span></h5>
-                                    <p class="text-muted small mb-0">Stockpile: @Math.Floor(_myState.Ironium)</p>
+                            <h2 class="credit-readout @(_creditPop ? "credit-pop" : null)">₡ @Math.Floor(_myState.Credits).ToString("N0")</h2>
+                            <p class="small text-muted mb-2">First to ₡@GameState.VictoryLine.ToString("N0") wins.</p>
+
+                            @if (_myState.IsOnStreak)
+                            {
+                                <div class="streak-banner">
+                                    🔥 HOT STREAK x@_myState.HotStreak · @_myState.StreakMultiplier.ToString("F2")x BONUS ACTIVE
                                 </div>
-                                <!-- Action Button -->
-                                <button class="btn btn-sm btn-outline-secondary" 
-                                        disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
-                                        @onclick="@(() => HandleDeployClick("Ironium"))">
-                                    @Loc["Deploy_Drone"] (₡500)
-                                </button>
-                                @if (!CanAffordDrone) { <div class="text-danger small mt-1">@Loc["Insufficient_Funds"]</div> }
+                            }
+
+                            <div class="timing-edge mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>Timing edge</span>
+                                    <strong class="@(_myState.HotSales >= _myState.ColdSales ? "text-success" : "text-danger")">
+                                        @_myState.HotSales hot · @_myState.ColdSales cold
+                                    </strong>
+                                </div>
+                                <div class="small text-muted">Skill is selling on HOT and holding on COLD — not who clicks more.</div>
                             </div>
 
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div>
-                                    <h5>Plasma <span class="badge bg-info">@_myState.ActivePlasmaDrones Active</span></h5>
-                                    <p class="text-muted small mb-0">Stockpile: @Math.Floor(_myState.Plasma)</p>
-                                </div>
-                                <!-- Action Button -->
-                                <button class="btn btn-sm btn-outline-info" 
-                                        disabled="@(!CanAffordDrone || _isActionLocked || _myState.IsEmpMuted)"
-                                        @onclick="@(() => HandleDeployClick("Plasma"))">
-                                    @Loc["Deploy_Drone"] (₡500)
-                                </button>
-                                @if (!CanAffordDrone) { <div class="text-danger small mt-1">@Loc["Insufficient_Funds"]</div> }
+                            <div class="coach-target @HighlightClass("deploy")">
+                                @ResourceDeck("Ironium", _myState.Ironium, _myState.ActiveIroniumDrones, "btn-outline-info")
+                                @ResourceDeck("Plasma", _myState.Plasma, _myState.ActivePlasmaDrones, "btn-outline-danger")
                             </div>
 
-                            <div class="mt-4 p-3 bg-dark border border-secondary rounded">
-                                <h5>Defensive Systems</h5>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <span class="text-info fw-bold">Active Firewalls: @_myState.FirewallCharges</span>
-                                    </div>
-                                    
-                                    <!-- Firewall costs physical resources, not Credits! -->
-                                    <button class="btn btn-sm btn-outline-light" 
+                            <div class="coach-target @HighlightClass("sell")">
+                                <p class="small text-muted mb-1">Sell turns stockpiles into race progress.</p>
+                            </div>
+
+                            <div class="mt-3 p-3 defense-well coach-target @HighlightClass("defense") @(_myState.FirewallCharges > 0 ? "has-charges" : null)">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <span class="text-info fw-bold">
+                                        🛡️ Firewalls: @_myState.FirewallCharges
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-light"
                                             disabled="@(!CanAffordFirewall || _isActionLocked || _myState.IsEmpMuted)"
+                                            title="Eats 1 enemy EMP or Virus"
                                             @onclick="HandleBuildFirewall">
-                                        BUILD FIREWALL (150 Fe / 50 Pl)
+                                        Build · 150 Fe / 50 Pl
                                     </button>
                                 </div>
                             </div>
+
+                            <div class="mt-2 p-3 power-surge-well">
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <span class="@(_myState.IsPowerSurgeActive ? "text-warning fw-bold" : "text-muted")">
+                                        @if (_myState.IsPowerSurgeActive)
+                                        {
+                                            var surgeRemain = Math.Max(0, (_myState.PowerSurgeUntilTick - _latestState!.CurrentTick) / 10.0);
+                                            <span>🚀 SURGE ACTIVE @surgeRemain.ToString("F0")s</span>
+                                        }
+                                        else
+                                        {
+                                            <span>🚀 Power Surge</span>
+                                        }
+                                    </span>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                            disabled="@(!CanAffordPowerSurge || _myState.IsPowerSurgeActive || _isActionLocked || _myState.IsEmpMuted)"
+                                            title="3x all drone output for 10 seconds"
+                                            @onclick="HandlePowerSurgeClick">
+                                        Surge · ₡4,000
+                                    </button>
+                                </div>
+                                <div class="small text-muted mt-1">3× all drones for 10s. Stacks with Overcharge.</div>
+                            </div>
+
+                            <div class="mt-2 p-2 text-center">
+                                <button class="btn btn-danger btn-sm w-100"
+                                        disabled="@(_myState.Ironium < 1 && _myState.Plasma < 1 || _isActionLocked || _myState.IsEmpMuted)"
+                                        title="Instantly sell all resources — breaks streak"
+                                        @onclick="HandleEmergencySell">
+                                    🚨 Emergency Sell All
+                                </button>
+                                <div class="small text-muted mt-1">Panic sell — breaks streak</div>
+                            </div>
                         }
                     </div>
                 </div>
             </div>
 
-            <!-- Middle Column: The Live Market -->
-            <div class="col-md-6">
-                <div class="card bg-dark border-primary">
-                    <div class="card-header border-bottom border-primary text-center fw-bold">
-                        GLOBAL MARKET (Tick: @_latestState.CurrentTick)
+            <div class="col-lg-6">
+                <div class="card market-card coach-target @HighlightClass("market") @(_myState != null && _myState.HasMarketVirus ? "virus-active" : null)">
+                    <div class="card-header text-center fw-bold">
+                        Live market @(_myState != null && _myState.HasMarketVirus ? "— ⚠ VIRUS CORRUPTED ⚠" : "")
                     </div>
-                    <div class="card-body d-flex justify-content-around text-center">
-                        @if (_latestState.MarketPrices.ContainsKey("Ironium"))
+                    <div class="card-body">
+                    <div class="d-flex justify-content-around text-center gap-3 flex-wrap">
+                        @foreach (var resource in new[] { "Ironium", "Plasma" })
                         {
-                            <div>
-                                <h4 class="text-info">Ironium</h4>
-                                <h2>₡ @_latestState.MarketPrices["Ironium"].ToString("F2")</h2>
+                            if (!_latestState.MarketPrices.ContainsKey(resource)) { continue; }
+                            var mood = PriceMood(resource);
+                            var price = _latestState.MarketPrices[resource];
+                            var trend = GetPriceTrend(resource, price);
+                            <div class="market-quote @mood">
+                                <div class="eyebrow">@resource</div>
+                                <h2>
+                                    ₡ @price.ToString("F2")
+                                    @if (trend > 0)
+                                    {
+                                        <span class="price-arrow up" title="Rising">▲</span>
+                                    }
+                                    else if (trend < 0)
+                                    {
+                                        <span class="price-arrow down" title="Falling">▼</span>
+                                    }
+                                </h2>
+                                <div class="mood-label">@MoodLabel(mood)</div>
                             </div>
                         }
-                        @if (_latestState.MarketPrices.ContainsKey("Plasma"))
+                    </div>
+                    <div class="mt-3 border-top border-secondary pt-3">
+                        <h6 class="text-info">COMBAT & MARKET LOG</h6>
+                        @if (_systemLog.Count == 0)
                         {
-                            <div>
-                                <h4 class="text-danger">Plasma</h4>
-                                <h2>₡ @_latestState.MarketPrices["Plasma"].ToString("F2")</h2>
-                            </div>
+                            <div class="small text-muted">No telemetry logged yet.</div>
                         }
+                        @foreach (var line in _systemLog)
+                        {
+                            <div class="combat-log-entry small text-warning">@line</div>
+                        }
+                        @foreach (var msg in _matchChat)
+                        {
+                            <div class="small"><strong class="text-info">@msg.SenderName:</strong> @msg.Message</div>
+                        }
+                        <div class="input-group input-group-sm mt-2">
+                            <input class="form-control bg-black text-light border-secondary" @bind="_chatInput" @bind:event="oninput" @onkeyup="HandleChatKey"
+                                   @onfocus="() => _chatFocused = true" @onblur="() => _chatFocused = false" placeholder="Match comms..." />
+                            <button class="btn btn-outline-info" @onclick="SendMatchChat">Send</button>
+                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Column: Opponent Intel -->
-            <div class="col-md-3">
-                <div class="card bg-danger text-white">
-                    <div class="card-header border-bottom border-dark fw-bold">
-                        RIVAL INTEL & OFFENSE
+            <div class="col-lg-3">
+                <div class="card rival-card coach-target @HighlightClass("rival")">
+                    <div class="card-header fw-bold">
+                        Rival intel
                     </div>
                     <div class="card-body">
                         @foreach (var opp in _opponents)
                         {
-                            <OpponentCard 
+                            <OpponentCard
                                 OpponentState="opp.Value"
-                                IsLaunchDisabled="@(!CanAffordEmp || _isActionLocked || _myState!.IsEmpMuted)"
-                                OnLaunchClicked="@(() => HandleSabotageClick(opp.Key, SabotageType.EMP))" />
+                                IsLaunchDisabled="@(!CanAffordEmp || _isActionLocked || _myState == null || _myState.IsEmpMuted)"
+                                IsVirusDisabled="@(!CanAffordVirus || _isActionLocked || _myState == null || _myState.IsEmpMuted)"
+                                OnLaunchEmpClicked="@(() => HandleSabotageClick(opp.Key, SabotageType.EMP))"
+                                OnLaunchVirusClicked="@(() => HandleSabotageClick(opp.Key, SabotageType.MarketVirus))" />
                         }
                     </div>
                 </div>
             </div>
         </div>
+
+        <ArenaCoach @ref="_coach"
+                    Enabled="@(_latestState.IsTutorial || _forceCoach)"
+                    State="_latestState"
+                    Me="_myState"
+                    OnHighlightChanged="OnCoachHighlight" />
     </div>
 }
 
@@ -170,76 +340,196 @@ else
     private GameState? _latestState;
     private PlayerState? _myState;
     private List<KeyValuePair<string, PlayerState>> _opponents = new();
-    
+
     private string _myPlayerId = string.Empty;
     private DateTime _lastRender = DateTime.MinValue;
+    private readonly List<string> _systemLog = new();
+    private readonly List<ChatMessage> _matchChat = new();
+    private string _chatInput = string.Empty;
+    private string? _joinError;
+    private string _coachHighlight = string.Empty;
+    private bool _forceCoach;
+    private ArenaCoach? _coach;
 
     private const decimal DroneCost = 500.0m;
     private const decimal EmpCost = 2000.0m;
-    private bool _isActionLocked = false;
+    private const decimal VirusCost = 3500.0m;
+    private const decimal OverchargeCost = 1500.0m;
 
-    // Local validation property
+    private bool _isActionLocked = false;
+    private bool _creditPop = false;
+    private bool _isEmpHit = false;
+    private bool _prevEmpState = false;
+    private int _lastAnnouncedMilestone = 0;
+    private bool _showMilestoneBanner = false;
+    private int _milestoneAmount = 0;
+
+    private const decimal PowerSurgeCost = 4000.0m;
+    private string? _matchAlertMessage;
+    private string _matchAlertType = "info";
+    private int _alertVersion = 0;
+    private ElementReference _arenaShell;
+    private bool _shellFocused;
+    private bool _chatFocused;
+
+    private RenderFragment Crown(string playerId) => __builder =>
+    {
+        if (_latestState == null || !_latestState.Players.TryGetValue(playerId, out var p)) return;
+        var leaderId = _latestState.Players.OrderByDescending(x => x.Value.Credits).First().Key;
+        if (leaderId != playerId || p.Credits <= 0) return;
+        <span class="lead-crown" title="Holding the lead">👑 @((p.DominanceTick / 10).ToString())s</span>
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_shellFocused && _latestState != null && _latestState.Status == GameStatus.InProgress)
+        {
+            _shellFocused = true;
+            try { await _arenaShell.FocusAsync(); } catch { /* element not ready */ }
+        }
+    }
+
+    private async Task HandleHotkey(KeyboardEventArgs e)
+    {
+        if (_chatFocused || e.Repeat || e.CtrlKey || e.AltKey || e.MetaKey) return;
+        if (_myState == null || _latestState?.Status != GameStatus.InProgress || _myState.IsEmpMuted) return;
+
+        switch (e.Key.ToLowerInvariant())
+        {
+            case "1": await HandleDeployClick("Ironium"); break;
+            case "2": await HandleDeployClick("Plasma"); break;
+            case "q": await HandleSellClick("Ironium", "all"); break;
+            case "w": await HandleSellClick("Plasma", "all"); break;
+            case "f": await HandleBuildFirewall(); break;
+            case "p": await HandlePowerSurgeClick(); break;
+            case "x": await HandleEmergencySell(); break;
+        }
+    }
+
+    private bool CanAffordPowerSurge => _myState != null && _myState.Credits >= PowerSurgeCost;
+
+    private string MatchTimerDisplay
+    {
+        get
+        {
+            var seconds = (_latestState?.CurrentTick ?? 0) / 10;
+            return $"{seconds / 60:00}:{seconds % 60:00}";
+        }
+    }
+
+    private readonly Dictionary<string, decimal> _prevPrices = new();
+
     private bool CanAffordDrone => _myState != null && _myState.Credits >= DroneCost;
     private bool CanAffordEmp => _myState != null && _myState.Credits >= EmpCost;
-    private bool CanAffordFirewall => _myState != null && 
-                                      _myState.Ironium >= 150 && 
+    private bool CanAffordVirus => _myState != null && _myState.Credits >= VirusCost;
+    private bool CanAffordOvercharge => _myState != null && _myState.Credits >= OverchargeCost;
+    private bool CanAffordFirewall => _myState != null &&
+                                      _myState.Ironium >= 150 &&
                                       _myState.Plasma >= 50;
+
+    private string HighlightClass(params string[] keys) =>
+        keys.Contains(_coachHighlight) ? "is-spotlight" : (_coachHighlight != string.Empty ? "is-dimmed" : string.Empty);
+
+    private void OnCoachHighlight(string highlight) => _coachHighlight = highlight;
+
+    private bool IsResourceOvercharged(string resource) =>
+        resource == "Ironium" ? (_myState?.IsIroniumOvercharged == true) : (_myState?.IsPlasmaOvercharged == true);
+
+    private double GetOverchargeSec(string resource)
+    {
+        if (_latestState == null || _myState == null) return 0;
+        var endTick = resource == "Ironium" ? _myState.OverchargeIroniumUntilTick : _myState.OverchargePlasmaUntilTick;
+        return Math.Max(0, (endTick - _latestState.CurrentTick) / 10.0);
+    }
+
+    private int StockpilePct(double stock, double cap) =>
+        (int)Math.Clamp(stock / cap * 100.0, 2, 100);
+
+    private int GetPriceTrend(string resource, decimal currentPrice)
+    {
+        if (_prevPrices.TryGetValue(resource, out var prev))
+        {
+            if (currentPrice > prev) return 1;
+            if (currentPrice < prev) return -1;
+        }
+        return 0;
+    }
 
     private async Task HandleDeployClick(string resource)
     {
         if (!CanAffordDrone || _isActionLocked || _myState == null) return;
 
-        // 1. Lock the UI instantly to prevent double-clicks
         _isActionLocked = true;
-
-        // 2. CLIENT-SIDE PREDICTION: Optimistically update the UI instantly
         _myState.Credits -= DroneCost;
         if (resource == "Ironium") _myState.ActiveIroniumDrones++;
         if (resource == "Plasma") _myState.ActivePlasmaDrones++;
-        
-        // Force the browser to draw the new numbers immediately (0ms latency!)
-        StateHasChanged(); 
+        _myState.DronesDeployed++;
+        StateHasChanged();
 
         try
         {
-            // 3. Transmit the intent to the authoritative server
             await GameManager.DispatchDroneAsync(resource);
         }
         catch
         {
-            // If the network call completely fails, rollback the prediction
             _myState.Credits += DroneCost;
             if (resource == "Ironium") _myState.ActiveIroniumDrones--;
             if (resource == "Plasma") _myState.ActivePlasmaDrones--;
+            _myState.DronesDeployed--;
             StateHasChanged();
         }
 
-        // 4. Brief cooldown before accepting next input
-        await Task.Delay(200); 
+        await Task.Delay(200);
+        _isActionLocked = false;
+    }
+
+    private async Task HandleOverchargeClick(string resource)
+    {
+        if (!CanAffordOvercharge || IsResourceOvercharged(resource) || _isActionLocked || _myState == null) return;
+
+        _isActionLocked = true;
+        _myState.Credits -= OverchargeCost;
+        if (resource == "Ironium") _myState.IsIroniumOvercharged = true;
+        if (resource == "Plasma") _myState.IsPlasmaOvercharged = true;
+        StateHasChanged();
+
+        try
+        {
+            await GameManager.DroneOverchargeAsync(resource);
+        }
+        catch
+        {
+            _myState.Credits += OverchargeCost;
+            if (resource == "Ironium") _myState.IsIroniumOvercharged = false;
+            if (resource == "Plasma") _myState.IsPlasmaOvercharged = false;
+            StateHasChanged();
+        }
+
+        await Task.Delay(200);
         _isActionLocked = false;
     }
 
     private async Task HandleSabotageClick(string targetId, SabotageType type)
     {
-        if (!CanAffordEmp || _isActionLocked || _myState == null) return;
+        var cost = type == SabotageType.EMP ? EmpCost : VirusCost;
+        if (_myState == null || _myState.Credits < cost || _isActionLocked) return;
 
         _isActionLocked = true;
-        
-        // PREDICTION: Instantly deduct credits. 
-        _myState.Credits -= EmpCost;
+        _myState.Credits -= cost;
+        _myState.SabotagesUsed++;
         StateHasChanged();
-        
+
         try
         {
             await GameManager.LaunchSabotageAsync(targetId, type);
         }
         catch
         {
-            _myState.Credits += EmpCost;
+            _myState.Credits += cost;
+            _myState.SabotagesUsed--;
             StateHasChanged();
         }
-        
-        // Brief local lock to prevent double-spending UI bugs
+
         await Task.Delay(200);
         _isActionLocked = false;
     }
@@ -249,16 +539,14 @@ else
         if (!CanAffordFirewall || _isActionLocked || _myState == null) return;
 
         _isActionLocked = true;
-        
-        // PREDICTION:
         _myState.Ironium -= 150;
         _myState.Plasma -= 50;
         _myState.FirewallCharges++;
         StateHasChanged();
-        
+
         try
         {
-            await GameManager.BuildDefenseAsync(DefenseType.Firewall); 
+            await GameManager.BuildDefenseAsync(DefenseType.Firewall);
         }
         catch
         {
@@ -267,34 +555,334 @@ else
             _myState.FirewallCharges--;
             StateHasChanged();
         }
-        
+
         await Task.Delay(200);
         _isActionLocked = false;
+    }
+
+    private void PlayAgain() => NavManager.NavigateTo("/lobby?queue=1");
+
+    private async Task HandlePowerSurgeClick()
+    {
+        if (!CanAffordPowerSurge || _myState == null || _myState.IsPowerSurgeActive || _isActionLocked) return;
+
+        _isActionLocked = true;
+        try
+        {
+            await GameManager.ActivatePowerSurgeAsync();
+        }
+        catch (Exception ex)
+        {
+            HandleSystemMessage($"Power Surge failed: {ex.Message}");
+        }
+
+        await Task.Delay(300);
+        _isActionLocked = false;
+    }
+
+    private async Task HandleEmergencySell()
+    {
+        if (_myState == null || _isActionLocked) return;
+        if (_myState.Ironium < 1 && _myState.Plasma < 1) return;
+
+        _isActionLocked = true;
+        try
+        {
+            await GameManager.EmergencySellAsync();
+            _creditPop = true;
+            StateHasChanged();
+            _ = Task.Delay(600).ContinueWith(_ => { _creditPop = false; InvokeAsync(StateHasChanged); });
+        }
+        catch (Exception ex)
+        {
+            HandleSystemMessage($"Emergency sell failed: {ex.Message}");
+        }
+
+        await Task.Delay(300);
+        _isActionLocked = false;
+    }
+
+    private void HandleMatchAlert(string alertType, string message)
+    {
+        _matchAlertType = string.IsNullOrWhiteSpace(alertType) ? "info" : alertType.ToLowerInvariant();
+        _matchAlertMessage = message;
+        var version = ++_alertVersion;
+        InvokeAsync(StateHasChanged);
+        _ = Task.Delay(4000).ContinueWith(_ =>
+        {
+            if (version == _alertVersion)
+            {
+                _matchAlertMessage = null;
+                InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void HandleComboAlert(string playerId, int streak, decimal multiplier)
+    {
+        if (streak < 2) return;
+        var who = playerId == _myPlayerId ? "You" : (_latestState?.Players.TryGetValue(playerId, out var p) == true ? p.PlayerName : "A rival");
+        HandleMatchAlert("combo", $"🔥 {who} on a x{streak} hot streak ({multiplier:F2}x payout)!");
+    }
+
+    private void HandlePowerSurgeActivated(string playerId, string playerName)
+    {
+        var who = playerId == _myPlayerId ? "You" : playerName;
+        HandleMatchAlert("surge", $"🚀 {who} activated POWER SURGE!");
+    }
+    private void ReplayTutorial() => NavManager.NavigateTo("/lobby?tutorial=1");
+
+    private int Pct(decimal credits)
+    {
+        var pct = (double)(credits / GameState.VictoryLine * 100m);
+        return (int)Math.Clamp(pct, 0, 100);
+    }
+
+    private string LeadLine
+    {
+        get
+        {
+            var mine = _myState?.Credits ?? 0;
+            var bestRival = _opponents.Count == 0 ? 0 : _opponents.Max(o => o.Value.Credits);
+            var gap = Math.Abs(mine - bestRival);
+            if (_opponents.Count == 0) return "Waiting on a rival.";
+            if (mine > bestRival) return $"You lead by ₡{Math.Floor(gap).ToString("N0")}";
+            if (bestRival > mine) return $"Behind by ₡{Math.Floor(gap).ToString("N0")}";
+            return "Dead heat.";
+        }
+    }
+
+    private string PriceMood(string resource)
+    {
+        if (_latestState == null) return "steady";
+        if (!_latestState.MarketPrices.TryGetValue(resource, out var price)) return "steady";
+        if (!_latestState.BasePrices.TryGetValue(resource, out var basePrice) || basePrice <= 0) return "steady";
+        var ratio = price / basePrice;
+        var mood = ratio >= 1.15m ? "hot" : (ratio <= 0.90m ? "cold" : "steady");
+        if (_myState?.HasMarketVirus == true)
+        {
+            // Corrupted visual display: inverted signals
+            return mood == "hot" ? "cold" : (mood == "cold" ? "hot" : "steady");
+        }
+        return mood;
+    }
+
+    private static string MoodLabel(string mood) => mood switch
+    {
+        "hot" => "Hot · sell now (+12%)",
+        "cold" => "Cold · hold (−12% if you sell)",
+        _ => "Steady"
+    };
+
+    private decimal EstimatePayout(string resource, double amount)
+    {
+        if (_latestState == null || !_latestState.MarketPrices.TryGetValue(resource, out var price))
+            return 0;
+        var payout = price * (decimal)amount;
+        var mood = PriceMood(resource);
+        if (mood == "hot")
+        {
+            // Mirrors the server: the next hot sell bumps the streak before applying the multiplier
+            var nextStreak = (_myState?.HotStreak ?? 0) + 1;
+            var streakMult = Math.Min(2.5m, 1.0m + (nextStreak - 1) * 0.25m);
+            payout *= 1.12m * streakMult;
+        }
+        else if (mood == "cold") payout *= 0.88m;
+        return Math.Floor(payout);
+    }
+
+    private RenderFragment ResourceDeck(string resource, double stock, int drones, string deployClass) =>
+        @<div class="resource-deck @(IsResourceOvercharged(resource) ? "overcharged" : null) mb-3 p-2 rounded border border-secondary">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">
+                        @resource 
+                        <span class="badge bg-dark border">@drones drones</span>
+                        @if (IsResourceOvercharged(resource))
+                        {
+                            <span class="overcharge-badge ms-1">⚡ 2x BOOST (@GetOverchargeSec(resource).ToString("F0")s)</span>
+                        }
+                    </h5>
+                    <p class="text-muted small mb-0">Stockpile @Math.Floor(stock)</p>
+                </div>
+                <div class="d-flex gap-1 flex-wrap">
+                    <button class="btn btn-sm @deployClass"
+                            disabled="@(!CanAffordDrone || _isActionLocked || _myState!.IsEmpMuted)"
+                            @onclick="@(() => HandleDeployClick(resource))">
+                        Deploy ₡500
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning"
+                            disabled="@(!CanAffordOvercharge || IsResourceOvercharged(resource) || _isActionLocked || _myState!.IsEmpMuted)"
+                            title="Doubles harvest speed for 20s"
+                            @onclick="@(() => HandleOverchargeClick(resource))">
+                        ⚡ Overcharge ₡1500
+                    </button>
+                </div>
+            </div>
+            
+            <div class="stockpile-gauge" title="Stockpile capacity">
+                <div class="stockpile-gauge-fill @(resource == "Ironium" ? "iron" : "plasma")" 
+                     style="width:@StockpilePct(stock, resource == "Ironium" ? 250 : 80)%"></div>
+            </div>
+
+            @{
+                var mood = PriceMood(resource);
+                var clip = Math.Min(10, stock);
+            }
+            <div class="small mb-1 mt-2">
+                Quote is <strong class="mood-@mood">@mood</strong>
+                @if (clip >= 1)
+                {
+                    <span> · Sell 10 ≈ ₡@EstimatePayout(resource, clip).ToString("N0")</span>
+                }
+            </div>
+            <div class="sell-row coach-target @HighlightClass("sell")">
+                <button class="btn btn-sm @(mood == "hot" ? "btn-warning" : "btn-outline-warning")" disabled="@(stock < 1 || _isActionLocked || _myState!.IsEmpMuted)" @onclick="@(() => HandleSellClick(resource, "clip"))">Sell 10</button>
+                <button class="btn btn-sm btn-outline-warning" disabled="@(stock < 2 || _isActionLocked || _myState!.IsEmpMuted)" @onclick="@(() => HandleSellClick(resource, "half"))">Half</button>
+                <button class="btn btn-sm btn-outline-warning" disabled="@(stock < 1 || _isActionLocked || _myState!.IsEmpMuted)" @onclick="@(() => HandleSellClick(resource, "all"))">All</button>
+            </div>
+        </div>;
+
+    private async Task HandleSellClick(string resource, string size)
+    {
+        if (_isActionLocked || _myState == null || _latestState == null) return;
+        var stock = resource == "Ironium" ? _myState.Ironium : _myState.Plasma;
+        if (stock < 1) return;
+
+        var amount = size switch
+        {
+            "half" => Math.Floor(stock / 2),
+            "all" => Math.Floor(stock),
+            _ => Math.Min(10, stock)
+        };
+        if (amount < 1) return;
+        _isActionLocked = true;
+
+        if (_latestState.MarketPrices.TryGetValue(resource, out var price))
+        {
+            if (resource == "Ironium") _myState.Ironium -= amount;
+            else _myState.Plasma -= amount;
+            _myState.Credits += price * (decimal)amount;
+            _creditPop = true;
+            StateHasChanged();
+            _ = Task.Delay(600).ContinueWith(_ => { _creditPop = false; InvokeAsync(StateHasChanged); });
+        }
+
+        try
+        {
+            await GameManager.SellResourceAsync(resource, amount);
+        }
+        catch
+        {
+            if (resource == "Ironium") _myState.Ironium += amount;
+            else _myState.Plasma += amount;
+            if (_latestState.MarketPrices.TryGetValue(resource, out price))
+                _myState.Credits -= price * (decimal)amount;
+            StateHasChanged();
+        }
+
+        await Task.Delay(200);
+        _isActionLocked = false;
+    }
+
+    private async Task SendMatchChat()
+    {
+        if (string.IsNullOrWhiteSpace(_chatInput)) return;
+        var text = _chatInput;
+        _chatInput = string.Empty;
+        await GameManager.SendChatMessage(text, "Match");
+    }
+
+    private async Task HandleChatKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SendMatchChat();
     }
 
     protected override async Task OnInitializedAsync()
     {
         _myPlayerId = await GameManager.GetCurrentPlayerIdAsync();
-        
+        var arenaDone = await LocalStorage.GetItemAsync<bool?>(ArenaCoach.StorageKey);
+        _forceCoach = arenaDone != true;
+
         GameManager.OnGameStateUpdated += HandleGameState;
+        GameManager.OnSystemMessageReceived += HandleSystemMessage;
+        GameManager.OnChatMessageReceived += HandleMatchChat;
+        GameManager.OnMatchAlert += HandleMatchAlert;
+        GameManager.OnComboAlert += HandleComboAlert;
+        GameManager.OnPowerSurgeActivated += HandlePowerSurgeActivated;
+
+        try
+        {
+            if (!GameManager.IsConnected)
+                await GameManager.ConnectAsync();
+
+            await GameManager.EnterMatchAsync(MatchId);
+        }
+        catch (Exception ex)
+        {
+            _joinError = ex.Message;
+            _systemLog.Add($"Uplink failed: {ex.Message}");
+        }
+    }
+
+    private void HandleSystemMessage(string message)
+    {
+        _systemLog.Add(message);
+        if (_systemLog.Count > 10) _systemLog.RemoveAt(0);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleMatchChat(ChatMessage message)
+    {
+        if (message.Channel != "Match") return;
+        _matchChat.Add(message);
+        if (_matchChat.Count > 20) _matchChat.RemoveAt(0);
+        InvokeAsync(StateHasChanged);
     }
 
     private void HandleGameState(GameState state)
     {
-        // 1. Validate this tick is for our current match
         if (state.MatchId != MatchId) return;
 
+        // Track price changes for direction arrows
+        foreach (var kvp in state.MarketPrices)
+        {
+            _prevPrices[kvp.Key] = kvp.Value;
+        }
+
         _latestState = state;
-        
-        // 2. Separate "Me" from "Opponents"
+
         if (state.Players.TryGetValue(_myPlayerId, out var mine))
         {
+            // EMP hit detection for screen shake
+            if (mine.IsEmpMuted && !_prevEmpState)
+            {
+                _isEmpHit = true;
+                _ = Task.Delay(600).ContinueWith(_ => { _isEmpHit = false; InvokeAsync(StateHasChanged); });
+            }
+            _prevEmpState = mine.IsEmpMuted;
+
+            // Milestone celebrations
+            int milestone = mine.Credits >= 40000m ? 40000 : (mine.Credits >= 25000m ? 25000 : (mine.Credits >= 10000m ? 10000 : 0));
+            if (milestone > _lastAnnouncedMilestone)
+            {
+                _lastAnnouncedMilestone = milestone;
+                _milestoneAmount = milestone;
+                _showMilestoneBanner = true;
+                _ = Task.Delay(3500).ContinueWith(_ => { _showMilestoneBanner = false; InvokeAsync(StateHasChanged); });
+            }
+
             _myState = mine;
         }
+
         _opponents = state.Players.Where(p => p.Key != _myPlayerId).ToList();
 
-        // 3. UI Render Throttling (Render max 5 times a second to save CPU)
-        if ((DateTime.UtcNow - _lastRender).TotalMilliseconds > 200)
+        if (state.Status == GameStatus.Finished && state.IsTutorial && state.WinnerId == _myPlayerId)
+            _ = _coach?.MarkWonAsync();
+
+        var finished = state.Status == GameStatus.Finished;
+        if (finished || (DateTime.UtcNow - _lastRender).TotalMilliseconds > 200)
         {
             _lastRender = DateTime.UtcNow;
             InvokeAsync(StateHasChanged);
@@ -304,5 +892,10 @@ else
     public void Dispose()
     {
         GameManager.OnGameStateUpdated -= HandleGameState;
+        GameManager.OnSystemMessageReceived -= HandleSystemMessage;
+        GameManager.OnChatMessageReceived -= HandleMatchChat;
+        GameManager.OnMatchAlert -= HandleMatchAlert;
+        GameManager.OnComboAlert -= HandleComboAlert;
+        GameManager.OnPowerSurgeActivated -= HandlePowerSurgeActivated;
     }
 }

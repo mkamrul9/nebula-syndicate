@@ -41,6 +41,7 @@
         {
             await GameManager.SendChatMessage(_chatInput, "Global");
             _chatInput = string.Empty;
+            StateHasChanged();
         }
     }
 

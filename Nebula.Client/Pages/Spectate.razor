@@ -5,10 +5,17 @@
 @implements IDisposable
 
 <div class="container-fluid bg-dark text-white min-vh-100">
-    @if (_delayedState == null)
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="d-flex justify-content-center align-items-center vh-100">
+            <h3 class="text-danger">@_error</h3>
+        </div>
+    }
+    else if (_delayedState == null)
     {
         <div class="d-flex justify-content-center align-items-center vh-100">
             <h3 class="text-warning blink">BUFFERING BROADCAST DELAY...</h3>
+            <p class="text-muted mt-3">The public feed trails the live match by 3 minutes.</p>
         </div>
     }
     else
@@ -35,15 +42,26 @@
     public string MatchId { get; set; } = string.Empty;
 
     private GameState? _delayedState;
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
         GameManager.OnSpectatorTickReceived += UpdateView;
-        await GameManager.StartWatchingMatchAsync(MatchId);
+        try
+        {
+            if (!GameManager.IsConnected)
+                await GameManager.ConnectAsync();
+            await GameManager.StartWatchingMatchAsync(MatchId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
     }
 
     private void UpdateView(GameState state)
     {
+        if (state.MatchId != MatchId) return;
         _delayedState = state;
         InvokeAsync(StateHasChanged);
     }

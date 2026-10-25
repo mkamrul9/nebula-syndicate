@@ -1,0 +1,213 @@
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+@if (_active && Current != null)
+{
+    <div class="arena-coach @Current.Highlight">
+        <div class="arena-coach-inner">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <p class="eyebrow mb-0">TACTICAL INSTRUCTOR · STEP @(_step + 1) / @_steps.Length</p>
+                    @if (_justCompleted)
+                    {
+                        <span class="badge bg-success text-dark">✔ COMPLETED!</span>
+                    }
+                </div>
+                <h4 class="mb-1 text-warning">@Current.Title</h4>
+                <p class="mb-1">@Current.Body</p>
+
+                @if (!string.IsNullOrEmpty(Current.Why))
+                {
+                    <div class="my-1">
+                        <button type="button" class="btn btn-link btn-sm text-info p-0 text-decoration-none" @onclick="ToggleWhy">
+                            @(_showWhy ? "▾ Hide Strategy Intel" : "▸ Why does this matter?")
+                        </button>
+                        @if (_showWhy)
+                        {
+                            <div class="p-2 mt-1 rounded bg-black border border-info small text-light">
+                                💡 @Current.Why
+                            </div>
+                        }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Current.WaitHint) && !Current.AllowContinue)
+                {
+                    <p class="coach-wait mt-1 mb-0 text-cyan">⌛ @Current.WaitHint</p>
+                }
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                @if (Current.AllowContinue)
+                {
+                    <button type="button" class="btn btn-warning fw-bold px-3" @onclick="Advance">@(IsLast ? "Finish Briefing" : "Next Step →")</button>
+                }
+                <button type="button" class="btn btn-outline-light btn-sm" @onclick="SkipAll">Dismiss Coach</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public const string StorageKey = "nebula.arena.tutorial.done";
+
+    [Parameter] public GameState? State { get; set; }
+    [Parameter] public PlayerState? Me { get; set; }
+    [Parameter] public bool Enabled { get; set; }
+    [Parameter] public EventCallback<string> OnHighlightChanged { get; set; }
+    [Parameter] public EventCallback OnFinished { get; set; }
+
+    private bool _active;
+    private int _step;
+    private int _startDrones;
+    private double _startIronium;
+    private decimal _startCredits;
+    private int _startFirewalls;
+    private int _startSabotages;
+    private bool _baselined;
+    private bool _showWhy;
+    private bool _justCompleted;
+
+    private static readonly CoachStep[] _steps =
+    {
+        new("race", "The Victory Scoreboard",
+            "The top progress track is the definitive scoreboard. First syndicate to reach ₡50,000 extraction credits wins immediately.",
+            "Why: In Nebula Syndicate, holding ore earns you nothing. Only credits won from market trades advance your bar. Keeping track of the distance between you and the rival dictates whether you should play greedy or attack.",
+            AllowContinue: true),
+
+        new("syndicate", "Your Syndicate Management Hub",
+            "The left column displays your live resources, active harvester drones, timing edge index, and network defenses.",
+            "Why: Good macro-management is about keeping your ore flowing while keeping enough liquid cash for emergency EMP strikes or defensive shields.",
+            AllowContinue: true),
+
+        new("deploy", "Deploy Harvester Drones",
+            "Click Deploy ₡500 on Ironium. Drones automatically gather raw ore each second.",
+            "Why: Without drones, your stockpile stays empty. Starting with 3 Ironium and 1 Plasma gives you high ore volume to sell whenever a spike hits.",
+            "Deploy at least one harvester drone now…",
+            AllowContinue: false),
+
+        new("market", "Reading Live Market Movements",
+            "The central terminal streams real-time Ironium and Plasma prices. Quotes oscillate between HOT, STEADY, and COLD.",
+            "Why: The market is algorithmic and volatile. HOT quotes grant a +12% execution bounty. COLD quotes penalize you −12%. High-tier players let their stockpiles build up and only strike when the quote glows HOT.",
+            AllowContinue: true),
+
+        new("sell", "Execute a Strategic Trade",
+            "Click Sell 10 or Half on a resource with a healthy stockpile. Notice your Timing edge index adjust.",
+            "Why: Timing edge tracks whether you make smart trades or panic trades. Positive timing edge guarantees faster progression than an opponent with the same drone count.",
+            "Execute a trade from your stockpile now…",
+            AllowContinue: false),
+
+        new("defense", "Construct Network Firewall",
+            "Construct a Firewall shield (costs 150 Ironium and 50 Plasma, 0 credits). Firewalls absorb 1 enemy EMP or Virus attack.",
+            "Why: Building firewalls converts raw ore into invulnerability. Having a shield ready prevents the rival from freezing you during your critical liquidation push.",
+            "Construct a Firewall defense now…",
+            AllowContinue: false),
+
+        new("rival", "Sabotage and Disrupt Rival",
+            "Check the rival card on the right. When their stockpile is heavy, fire an EMP to shut down their terminal for 10 seconds.",
+            "Why: EMP costs ₡2,000, so firing randomly burns cash. Firing right when they are about to sell freezes their momentum and allows you to surge past them.",
+            "Fire an EMP or Market Virus at the rival…",
+            AllowContinue: false),
+
+        new("win", "Seize the Extraction Line",
+            "Maintain your rhythm: expand drones, build a firewall buffer, sell spikes, and sabotage rival dump attempts. First to ₡50,000 takes the sector!",
+            "Why: Consistency beats raw speed. Manage your stockpiles and out-think the market.",
+            AllowContinue: true)
+    };
+
+    private CoachStep? Current => _active && _step < _steps.Length ? _steps[_step] : null;
+    private bool IsLast => _step >= _steps.Length - 1;
+
+    private void ToggleWhy() => _showWhy = !_showWhy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Enabled || State == null || Me == null)
+            return;
+
+        if (!_active && !_baselined)
+        {
+            var done = await LocalStorage.GetItemAsync<bool?>(StorageKey);
+            if (done == true && !State.IsTutorial)
+                return;
+
+            _active = true;
+            _baselined = true;
+            _startDrones = Me.DronesDeployed;
+            _startIronium = Me.Ironium;
+            _startCredits = Me.Credits;
+            _startFirewalls = Me.FirewallCharges;
+            _startSabotages = Me.SabotagesUsed;
+            await NotifyHighlight();
+        }
+
+        if (!_active || Current == null)
+            return;
+
+        TryAutoAdvance();
+    }
+
+    private void TryAutoAdvance()
+    {
+        if (Me == null || Current == null) return;
+
+        var shouldAdvance = Current.Highlight switch
+        {
+            "deploy" => Me.DronesDeployed > _startDrones,
+            "sell" => Me.Credits > _startCredits + 40m || Me.Ironium < _startIronium - 5,
+            "defense" => Me.FirewallCharges > _startFirewalls,
+            "rival" => Me.SabotagesUsed > _startSabotages,
+            _ => false
+        };
+
+        if (shouldAdvance && !_justCompleted)
+        {
+            _justCompleted = true;
+            _ = Task.Delay(500).ContinueWith(_ =>
+            {
+                _justCompleted = false;
+                InvokeAsync(Advance);
+            });
+        }
+    }
+
+    private async Task Advance()
+    {
+        if (!_active) return;
+        _showWhy = false;
+        if (_step >= _steps.Length - 1)
+        {
+            await FinishAsync();
+            return;
+        }
+
+        _step++;
+        if (Me != null)
+        {
+            _startDrones = Me.DronesDeployed;
+            _startIronium = Me.Ironium;
+            _startCredits = Me.Credits;
+            _startFirewalls = Me.FirewallCharges;
+            _startSabotages = Me.SabotagesUsed;
+        }
+        await NotifyHighlight();
+    }
+
+    private async Task SkipAll() => await FinishAsync();
+
+    private async Task FinishAsync()
+    {
+        _active = false;
+        await LocalStorage.SetItemAsync(StorageKey, true);
+        await OnHighlightChanged.InvokeAsync(string.Empty);
+        await OnFinished.InvokeAsync();
+    }
+
+    private Task NotifyHighlight() =>
+        OnHighlightChanged.InvokeAsync(Current?.Highlight ?? string.Empty);
+
+    public async Task MarkWonAsync()
+    {
+        await LocalStorage.SetItemAsync(StorageKey, true);
+    }
+
+    private sealed record CoachStep(string Highlight, string Title, string Body, string Why, string WaitHint = "", bool AllowContinue = false);
+}

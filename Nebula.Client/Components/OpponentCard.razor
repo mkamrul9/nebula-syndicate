@@ -1,20 +1,70 @@
 @* File: Nebula.Client/Components/OpponentCard.razor *@
 @using Nebula.Shared.Models
 
-<div class="mb-3 border-bottom border-dark pb-3">
-    <h6>@OpponentState.PlayerName 
-        @if(!OpponentState.IsConnected) { <span class="badge bg-warning text-dark">OFFLINE</span> }
-        @if(OpponentState.IsEmpMuted) { <span class="badge bg-dark text-danger blink">EMP'D</span> }
-    </h6>
-    <div class="small text-light mb-2">
-        Ironium Drones: @OpponentState.ActiveIroniumDrones | Plasma Drones: @OpponentState.ActivePlasmaDrones
+<div class="rival-intel">
+    <div class="d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">@OpponentState.PlayerName</h6>
+        <div class="d-flex gap-1 align-items-center">
+            @if (OpponentState.FirewallCharges > 0)
+            {
+                <span class="badge bg-dark border border-info text-info firewall-count" title="Firewall Shield active">
+                    🛡️ @OpponentState.FirewallCharges
+                </span>
+            }
+            @if (!OpponentState.IsConnected)
+            {
+                <span class="badge bg-warning text-dark">Offline</span>
+            }
+            @if (OpponentState.IsEmpMuted)
+            {
+                <span class="badge bg-dark text-danger blink">EMP MUTED</span>
+            }
+            @if (OpponentState.HasMarketVirus)
+            {
+                <span class="badge bg-dark text-warning border border-warning">VIRUS</span>
+            }
+        </div>
     </div>
-    
-    <button class="btn btn-sm btn-dark text-danger w-100 fw-bold border-danger"
-            disabled="@IsLaunchDisabled"
-            @onclick="OnLaunchClicked">
-        LAUNCH EMP (₡2000)
-    </button>
+
+    <!-- Threat Bar -->
+    <div class="threat-indicator @ThreatClass" title="Threat assessment: @ThreatLabel"></div>
+
+    <div class="small mb-1">₡@Math.Floor(OpponentState.Credits).ToString("N0") · @OpponentState.ActiveIroniumDrones Fe · @OpponentState.ActivePlasmaDrones Pl</div>
+    <div class="race-track mb-2"><div class="race-fill rival @(OpponentState.Credits >= 25000 ? "leading" : null)" style="width:@Pct%"></div></div>
+
+    <!-- Stockpile Estimation Gauges -->
+    <div class="rival-resource-gauge mb-2">
+        <div class="rival-gauge-item">
+            <div class="rival-gauge-label">Ironium: ~@((int)Math.Floor(OpponentState.Ironium))</div>
+            <div class="rival-gauge-bar"><div class="rival-gauge-fill iron" style="width:@RivalIronPct%"></div></div>
+        </div>
+        <div class="rival-gauge-item">
+            <div class="rival-gauge-label">Plasma: ~@((int)Math.Floor(OpponentState.Plasma))</div>
+            <div class="rival-gauge-bar"><div class="rival-gauge-fill plasma" style="width:@RivalPlasmaPct%"></div></div>
+        </div>
+    </div>
+
+    @if (DumpThreat)
+    {
+        <div class="dump-threat mb-2">⚠ DUMP THREAT: Massive stockpile detected! Cash-in imminent. EMP now!</div>
+    }
+    else
+    {
+        <div class="small text-muted mb-2">Stockpile light. Save sabotage for high-value liquidation windows.</div>
+    }
+
+    <div class="d-grid gap-2">
+        <button class="btn btn-sm btn-danger fw-bold"
+                disabled="@IsLaunchDisabled"
+                @onclick="HandleEmpClick">
+            ⚡ Launch EMP · ₡2,000
+        </button>
+        <button class="btn btn-sm btn-outline-warning fw-bold"
+                disabled="@(IsVirusDisabled || IsLaunchDisabled)"
+                @onclick="HandleVirusClick">
+            ☣ Market Virus · ₡3,500
+        </button>
+    </div>
 </div>
 
 @code {
@@ -25,38 +75,47 @@
     public bool IsLaunchDisabled { get; set; }
 
     [Parameter]
+    public bool IsVirusDisabled { get; set; }
+
+    [Parameter]
     public EventCallback OnLaunchClicked { get; set; }
 
-    // Track the previous state to compare against
-    private int _prevFeDrones;
-    private int _prevPlDrones;
-    private bool _prevEmpStatus;
-    private bool _prevConnectedStatus;
-    private bool _prevDisabledStatus;
+    [Parameter]
+    public EventCallback OnLaunchEmpClicked { get; set; }
 
-    // Short-circuit the expensive DOM diffing algorithm
-    protected override bool ShouldRender()
+    [Parameter]
+    public EventCallback OnLaunchVirusClicked { get; set; }
+
+    private int Pct => (int)Math.Clamp((double)(OpponentState.Credits / GameState.VictoryLine * 100m), 0, 100);
+    private bool DumpThreat => OpponentState.Ironium + OpponentState.Plasma * 2 >= 40;
+
+    private int RivalIronPct => (int)Math.Clamp(OpponentState.Ironium / 150.0 * 100, 2, 100);
+    private int RivalPlasmaPct => (int)Math.Clamp(OpponentState.Plasma / 60.0 * 100, 2, 100);
+
+    private string ThreatClass => (OpponentState.Credits >= 35000 || DumpThreat)
+        ? "threat-high"
+        : (OpponentState.Credits >= 18000 || OpponentState.Ironium + OpponentState.Plasma >= 25)
+            ? "threat-medium"
+            : "threat-low";
+
+    private string ThreatLabel => ThreatClass switch
     {
-        // Only allow Blazor to spend CPU cycles updating this specific component's HTML 
-        // if the visual data has actually changed since the last tick.
-        bool hasChanged = 
-            _prevFeDrones != OpponentState.ActiveIroniumDrones ||
-            _prevPlDrones != OpponentState.ActivePlasmaDrones ||
-            _prevEmpStatus != OpponentState.IsEmpMuted ||
-            _prevConnectedStatus != OpponentState.IsConnected ||
-            _prevDisabledStatus != IsLaunchDisabled;
+        "threat-high" => "CRITICAL",
+        "threat-medium" => "ELEVATED",
+        _ => "NORMAL"
+    };
 
-        if (hasChanged)
-        {
-            _prevFeDrones = OpponentState.ActiveIroniumDrones;
-            _prevPlDrones = OpponentState.ActivePlasmaDrones;
-            _prevEmpStatus = OpponentState.IsEmpMuted;
-            _prevConnectedStatus = OpponentState.IsConnected;
-            _prevDisabledStatus = IsLaunchDisabled;
-            return true;
-        }
+    private async Task HandleEmpClick()
+    {
+        if (OnLaunchEmpClicked.HasDelegate)
+            await OnLaunchEmpClicked.InvokeAsync();
+        else if (OnLaunchClicked.HasDelegate)
+            await OnLaunchClicked.InvokeAsync();
+    }
 
-        // The state is identical to the last 100ms. Do not re-render the DOM.
-        return false;
+    private async Task HandleVirusClick()
+    {
+        if (OnLaunchVirusClicked.HasDelegate)
+            await OnLaunchVirusClicked.InvokeAsync();
     }
 }

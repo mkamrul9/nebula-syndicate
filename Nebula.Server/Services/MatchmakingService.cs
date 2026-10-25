@@ -20,6 +20,8 @@ namespace Nebula.Server.Services
 
         private readonly GameStateManager _gameStateManager;
         private readonly PlayerConnectionTracker _tracker;
+        private readonly ConcurrentDictionary<string, byte> _queuedPlayerIds = new();
+        private readonly ConcurrentDictionary<string, byte> _cancelledConnections = new();
 
         public MatchmakingService(
             IHubContext<GameHub, IGameClient> hubContext, 
@@ -47,17 +49,36 @@ namespace Nebula.Server.Services
             return !_isAcceptingNewMatches && _gameStateManager.GetActiveMatchCount() == 0;
         }
 
-        // The Hub calls this method to add players
-        public bool TryEnqueuePlayer(QueuedPlayer player, string region)
+        public EnqueueResult TryEnqueuePlayer(QueuedPlayer player, string region)
         {
             if (!_isAcceptingNewMatches)
+                return EnqueueResult.ShuttingDown;
+
+            if (string.IsNullOrWhiteSpace(player.PlayerId))
+                return EnqueueResult.Rejected;
+
+            var existingMatch = _tracker.GetActiveMatchIdForPlayer(player.PlayerId);
+            if (existingMatch != null)
             {
-                return false;
+                // Stale after a server restart / finished match that left a tracker entry.
+                if (_gameStateManager.GetMatch(existingMatch) == null)
+                    _tracker.RemovePlayerFromMatch(player.PlayerId);
+                else
+                    return EnqueueResult.AlreadyBusy;
             }
+
+            if (!_queuedPlayerIds.TryAdd(player.PlayerId, 0))
+                return EnqueueResult.AlreadyBusy;
 
             var queue = _regionalQueues.GetOrAdd(region, _ => new ConcurrentQueue<QueuedPlayer>());
             queue.Enqueue(player);
-            return true;
+            return EnqueueResult.Queued;
+        }
+
+        public void CancelQueuedConnection(string connectionId, string playerId)
+        {
+            _cancelledConnections[connectionId] = 0;
+            _queuedPlayerIds.TryRemove(playerId, out _);
         }
 
         // This runs continuously in the background
@@ -75,7 +96,7 @@ namespace Nebula.Server.Services
                     {
                         if (queue.TryPeek(out var player))
                         {
-                            if ((DateTime.UtcNow - player.JoinedAt).TotalSeconds > 60)
+                            if ((DateTime.UtcNow - player.JoinedAt).TotalSeconds > 5)
                             {
                                 await TryCreateBotMatch(queue, region);
                             }
@@ -95,31 +116,45 @@ namespace Nebula.Server.Services
             // Try to dequeue the required number of players
             while (matchedPlayers.Count < PlayersRequired && queue.TryDequeue(out var player))
             {
+                if (IsCancelled(player))
+                    continue;
                 matchedPlayers.Add(player);
             }
 
             if (matchedPlayers.Count == PlayersRequired)
             {
-                // Create a unique Match ID
                 var matchId = Guid.NewGuid().ToString();
-
                 Console.WriteLine($"[Matchmaker] Match {matchId} created for {PlayersRequired} players.");
 
-                // Group players in SignalR so we can broadcast to just this match
+                var playerIds = matchedPlayers.Select(p => p.PlayerId).ToList();
+                _gameStateManager.InitializeMatch(matchId, playerIds);
+                var created = _gameStateManager.GetMatch(matchId);
+                if (created != null)
+                {
+                    foreach (var queued in matchedPlayers)
+                    {
+                        if (created.Players.TryGetValue(queued.PlayerId, out var playerState) &&
+                            !string.IsNullOrWhiteSpace(queued.DisplayName))
+                        {
+                            playerState.PlayerName = queued.DisplayName;
+                        }
+                    }
+                }
+
+                foreach (var id in playerIds)
+                {
+                    _queuedPlayerIds.TryRemove(id, out _);
+                    _tracker.AssignPlayerToMatch(id, matchId);
+                }
+
                 foreach (var p in matchedPlayers)
                 {
                     await _hubContext.Groups.AddToGroupAsync(p.ConnectionId, matchId);
-                    
-                    // Notify the specific client they found a match
                     await _hubContext.Clients.Client(p.ConnectionId).MatchJoined(matchId);
+                    if (created != null)
+                        await _hubContext.Clients.Client(p.ConnectionId).ReceiveGameStateTick(created);
                     await _hubContext.Clients.Client(p.ConnectionId)
                         .ReceiveSystemMessage("Match found! Prepare for extraction.");
-                }
-                var playerIds = matchedPlayers.Select(p => p.PlayerId);
-                _gameStateManager.InitializeMatch(matchId, playerIds);
-                foreach (var id in playerIds)
-                {
-                    _tracker.AssignPlayerToMatch(id, matchId);
                 }
             }
             else
@@ -132,36 +167,60 @@ namespace Nebula.Server.Services
             }
         }
 
+        private bool IsCancelled(QueuedPlayer player)
+        {
+            if (!_cancelledConnections.TryRemove(player.ConnectionId, out _))
+                return false;
+
+            _queuedPlayerIds.TryRemove(player.PlayerId, out _);
+            return true;
+        }
+
         private async Task TryCreateBotMatch(ConcurrentQueue<QueuedPlayer> queue, string region)
         {
             if (queue.TryDequeue(out var human))
             {
+                if (IsCancelled(human))
+                    return;
+
                 var matchId = Guid.NewGuid().ToString();
                 var actionQueue = new ConcurrentQueue<PlayerAction>();
                 var bot = new AiBotController(actionQueue);
 
                 Console.WriteLine($"[Matchmaker] Player {human.PlayerId} timed out. Provisioning AI Bot Match {matchId}.");
 
-                await _hubContext.Groups.AddToGroupAsync(human.ConnectionId, matchId);
-                
-                await _hubContext.Clients.Client(human.ConnectionId).MatchJoined(matchId);
-                await _hubContext.Clients.Client(human.ConnectionId)
-                    .ReceiveSystemMessage("Match found! Prepare for extraction.");
-
                 var playerIds = new[] { human.PlayerId, bot.BotId };
                 _gameStateManager.InitializeMatch(matchId, playerIds);
-                
+
                 var state = _gameStateManager.GetMatch(matchId);
                 if (state != null)
                 {
                     state.ActiveBot = bot;
                     state.PendingActions = actionQueue;
-                    state.Players[human.PlayerId].PlayerName = "Human Extractor";
+                    state.Players[human.PlayerId].PlayerName = string.IsNullOrWhiteSpace(human.DisplayName)
+                        ? "Human Extractor"
+                        : human.DisplayName;
                     state.Players[bot.BotId].PlayerName = "Syndicate AI";
                 }
 
+                _queuedPlayerIds.TryRemove(human.PlayerId, out _);
                 _tracker.AssignPlayerToMatch(human.PlayerId, matchId);
+
+                await _hubContext.Groups.AddToGroupAsync(human.ConnectionId, matchId);
+                await _hubContext.Clients.Client(human.ConnectionId).MatchJoined(matchId);
+                if (state != null)
+                    await _hubContext.Clients.Client(human.ConnectionId).ReceiveGameStateTick(state);
+                await _hubContext.Clients.Client(human.ConnectionId)
+                    .ReceiveSystemMessage("Match found! Prepare for extraction.");
             }
         }
+    }
+
+    public enum EnqueueResult
+    {
+        Queued,
+        ShuttingDown,
+        AlreadyBusy,
+        Rejected
     }
 }

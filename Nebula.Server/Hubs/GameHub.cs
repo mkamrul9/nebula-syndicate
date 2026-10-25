@@ -47,15 +47,23 @@ namespace Nebula.Server.Hubs
             {
                 if (Guid.TryParse(playerId, out var userId))
                 {
-                    var player = await _dbContext.Players.AsNoTracking().FirstOrDefaultAsync(p => p.Id == userId);
+                    var player = await _dbContext.Players.FirstOrDefaultAsync(p => p.Id == userId);
                     if (player != null && player.IsBanned)
                     {
                         if (player.BanExpiresAtUTC == null || player.BanExpiresAtUTC > DateTime.UtcNow)
                         {
-                            // They are currently banned. Reject the WebSocket connection.
+                            var reason = string.IsNullOrWhiteSpace(player.BanReason)
+                                ? "Account suspended."
+                                : player.BanReason;
+                            await Clients.Caller.ForceDisconnect(reason);
                             Context.Abort();
                             return;
                         }
+
+                        player.IsBanned = false;
+                        player.BanReason = null;
+                        player.BanExpiresAtUTC = null;
+                        await _dbContext.SaveChangesAsync();
                     }
                 }
 
@@ -107,6 +115,14 @@ namespace Nebula.Server.Hubs
                         
                         await Clients.Group(matchId).ReceiveSystemMessage($"Player {playerId[..5]} disconnected. Waiting for reconnect...");
                     }
+                    else
+                    {
+                        _tracker.RemovePlayerFromMatch(playerId);
+                    }
+                }
+                else
+                {
+                    _matchmaker.CancelQueuedConnection(Context.ConnectionId, playerId);
                 }
             }
             
@@ -151,24 +167,119 @@ namespace Nebula.Server.Hubs
         // Client calls this to queue for a match
         public async Task JoinMatchQueue()
         {
-            var playerId = Context.UserIdentifier ?? "Guest"; 
-            var connectionId = Context.ConnectionId;
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId))
+                throw new HubException("Authentication required.");
 
-            var success = _matchmaker.TryEnqueuePlayer(new QueuedPlayer
+            var result = _matchmaker.TryEnqueuePlayer(new QueuedPlayer
             {
                 PlayerId = playerId,
-                ConnectionId = connectionId
+                DisplayName = Context.User?.Identity?.Name ?? "Extractor",
+                ConnectionId = Context.ConnectionId
             }, _serverRegion);
-            
-            if (!success)
+
+            switch (result)
             {
-                // Instruct the client to reconnect, load balancer will pick up the new v2 server
-                await Clients.Caller.ReceiveSystemMessage("Server is shutting down for an update. Please reconnect.");
-                Context.Abort();
-                return;
+                case EnqueueResult.ShuttingDown:
+                    await Clients.Caller.ReceiveSystemMessage("Server is shutting down for an update. Please reconnect.");
+                    Context.Abort();
+                    return;
+                case EnqueueResult.AlreadyBusy:
+                    throw new HubException("You are already queued or in a match.");
+                case EnqueueResult.Rejected:
+                    throw new HubException("Could not join the queue.");
             }
             
             await Clients.Caller.ReceiveSystemMessage("Entered matchmaking queue. Searching for rivals...");
+        }
+
+        // Instant soft bot match with in-arena coaching. Used for the first win.
+        public async Task StartTutorialMatch()
+        {
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId))
+                throw new HubException("Authentication required.");
+
+            var existing = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (existing != null)
+            {
+                if (_gameStateManager.GetMatch(existing) == null)
+                    _tracker.RemovePlayerFromMatch(playerId);
+                else
+                    throw new HubException("You are already in a match.");
+            }
+
+            _matchmaker.CancelQueuedConnection(Context.ConnectionId, playerId);
+
+            var matchId = Guid.NewGuid().ToString();
+            var actionQueue = new System.Collections.Concurrent.ConcurrentQueue<PlayerAction>();
+            var bot = new Nebula.Server.AI.AiBotController(actionQueue, tutorialMode: true);
+
+            _gameStateManager.InitializeMatch(matchId, new[] { playerId, bot.BotId });
+            var state = _gameStateManager.GetMatch(matchId)
+                ?? throw new HubException("Could not start the training match.");
+
+            state.IsTutorial = true;
+            state.ActiveBot = bot;
+            state.PendingActions = actionQueue;
+
+            if (state.Players.TryGetValue(playerId, out var human))
+            {
+                human.PlayerName = Context.User?.Identity?.Name ?? "Trainee";
+                human.Credits = 2500m;
+                human.ActiveIroniumDrones = 3;
+                human.ActivePlasmaDrones = 1;
+                human.Ironium = 180;
+                human.Plasma = 60;
+            }
+
+            if (state.Players.TryGetValue(bot.BotId, out var rival))
+            {
+                rival.PlayerName = "Training Rig";
+                rival.Credits = 800m;
+                rival.ActiveIroniumDrones = 1;
+                rival.ActivePlasmaDrones = 0;
+                rival.Ironium = 0;
+                rival.Plasma = 0;
+            }
+
+            _tracker.AssignPlayerToMatch(playerId, matchId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, matchId);
+            await Clients.Caller.MatchJoined(matchId);
+            await Clients.Caller.ReceiveGameStateTick(state);
+            await Clients.Caller.ReceiveSystemMessage("🎓 TRAINING MATCH: Soft rival. Follow the coach and take the line.");
+            Console.WriteLine($"[Matchmaker] Tutorial match {matchId} for {playerId}");
+        }
+
+        // Arena calls this after MatchJoined (or on refresh) so the connection is in the group
+        // and the client gets a state frame immediately instead of waiting forever.
+        public async Task EnterMatch(string matchId)
+        {
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId))
+                throw new HubException("Authentication required.");
+
+            var match = _gameStateManager.GetMatch(matchId);
+            if (match == null || match.Status != GameStatus.InProgress)
+            {
+                _tracker.RemovePlayerFromMatch(playerId);
+                throw new HubException("This match has ended. Return to the lobby and queue again.");
+            }
+
+            if (!match.Players.ContainsKey(playerId))
+                throw new HubException("You are not a player in this match.");
+
+            _tracker.AssignPlayerToMatch(playerId, matchId);
+            await Groups.AddToGroupAsync(Context.ConnectionId, matchId);
+
+            if (match.Players.TryGetValue(playerId, out var playerState))
+            {
+                playerState.IsConnected = true;
+                playerState.DisconnectedAt = null;
+            }
+
+            await Clients.Caller.ReceiveGameStateTick(match);
+            await Clients.Caller.ReceiveSystemMessage("Telemetry locked. Extraction live.");
         }
 
         public async Task WatchMatch(string matchId)
@@ -200,18 +311,19 @@ namespace Nebula.Server.Hubs
         }
 
         // Client calls this to take an action in-game
-        public async Task DispatchDrone(string targetNodeId)
+        public Task DispatchDrone(string targetNodeId)
         {
-            if (IsRateLimited()) return;
+            if (IsRateLimited()) return Task.CompletedTask;
 
             var playerId = Context.UserIdentifier;
-            if (string.IsNullOrEmpty(playerId)) return;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+            if (targetNodeId is not ("Ironium" or "Plasma")) return Task.CompletedTask;
 
             var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
-            if (matchId == null) return;
+            if (matchId == null) return Task.CompletedTask;
 
             var match = _gameStateManager.GetMatch(matchId);
-            if (match == null) return;
+            if (match == null) return Task.CompletedTask;
 
             // We do NOT deduct credits here. We just queue the intent.
             match.PendingActions.Enqueue(new PlayerAction
@@ -220,20 +332,22 @@ namespace Nebula.Server.Hubs
                 Type = ActionType.DeployDrone,
                 TargetResource = targetNodeId
             });
+
+            return Task.CompletedTask;
         }
 
-        public async Task LaunchSabotage(string targetPlayerId, SabotageType type)
+        public Task LaunchSabotage(string targetPlayerId, SabotageType type)
         {
-            if (IsRateLimited()) return;
+            if (IsRateLimited()) return Task.CompletedTask;
 
             var playerId = Context.UserIdentifier;
-            if (string.IsNullOrEmpty(playerId)) return;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
 
             var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
-            if (matchId == null) return;
+            if (matchId == null) return Task.CompletedTask;
 
             var match = _gameStateManager.GetMatch(matchId);
-            if (match == null) return;
+            if (match == null) return Task.CompletedTask;
 
             match.PendingActions.Enqueue(new PlayerAction
             {
@@ -242,17 +356,43 @@ namespace Nebula.Server.Hubs
                 TargetPlayerId = targetPlayerId,
                 Sabotage = type
             });
+
+            return Task.CompletedTask;
         }
 
-        public async Task BuildDefense(DefenseType type)
+        public Task SellResource(string resource, double amount)
         {
-            if (IsRateLimited()) return;
+            if (IsRateLimited()) return Task.CompletedTask;
 
             var playerId = Context.UserIdentifier;
-            if (string.IsNullOrEmpty(playerId)) return;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+            if (resource is not ("Ironium" or "Plasma")) return Task.CompletedTask;
+            if (double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0) return Task.CompletedTask;
 
             var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
-            if (matchId == null) return;
+            if (matchId == null) return Task.CompletedTask;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            match?.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.SellResource,
+                TargetResource = resource,
+                Amount = amount
+            });
+
+            return Task.CompletedTask;
+        }
+
+        public Task BuildDefense(DefenseType type)
+        {
+            if (IsRateLimited()) return Task.CompletedTask;
+
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return Task.CompletedTask;
 
             var match = _gameStateManager.GetMatch(matchId);
             match?.PendingActions.Enqueue(new PlayerAction
@@ -261,6 +401,72 @@ namespace Nebula.Server.Hubs
                 Type = ActionType.BuildDefense,
                 Defense = type
             });
+
+            return Task.CompletedTask;
+        }
+
+        public Task DroneOvercharge(string targetResource)
+        {
+            if (IsRateLimited()) return Task.CompletedTask;
+
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+            if (targetResource is not ("Ironium" or "Plasma")) return Task.CompletedTask;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return Task.CompletedTask;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            match?.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.DroneOvercharge,
+                TargetResource = targetResource
+            });
+
+            return Task.CompletedTask;
+        }
+
+        // Client calls this to activate a Power Surge (x3 drone output for 10s, costs ₡4000)
+        public Task ActivatePowerSurge()
+        {
+            if (IsRateLimited()) return Task.CompletedTask;
+
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return Task.CompletedTask;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            match?.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.ActivatePowerSurge
+            });
+
+            return Task.CompletedTask;
+        }
+
+        // Client calls this for an emergency sell-all of all resources at current prices
+        public Task EmergencySell()
+        {
+            if (IsRateLimited()) return Task.CompletedTask;
+
+            var playerId = Context.UserIdentifier;
+            if (string.IsNullOrEmpty(playerId)) return Task.CompletedTask;
+
+            var matchId = _tracker.GetActiveMatchIdForPlayer(playerId);
+            if (matchId == null) return Task.CompletedTask;
+
+            var match = _gameStateManager.GetMatch(matchId);
+            match?.PendingActions.Enqueue(new PlayerAction
+            {
+                PlayerId = playerId,
+                Type = ActionType.EmergencySell
+            });
+
+            return Task.CompletedTask;
         }
     }
 }

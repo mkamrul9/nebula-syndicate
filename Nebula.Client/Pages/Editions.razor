@@ -1,0 +1,154 @@
+@page "/editions"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Get Nebula</PageTitle>
+
+<div class="nebula-page">
+    <p class="eyebrow">One commander, every screen</p>
+    <h1 class="display-5">Play free. Buy the kit when you want the coins.</h1>
+    <p class="lead text-muted">Matches are free in the browser. Paid editions add syndicate coins for skins and the season, and they follow this login on phone, desktop, and web.</p>
+
+    @if (_success)
+    {
+        <div class="alert alert-success">Payment received. Coins land on this commander as soon as the bank confirms the charge. Open the store to spend them.</div>
+    }
+    @if (_canceled)
+    {
+        <div class="alert alert-secondary">Checkout canceled. The free match is still open.</div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+
+    @if (_editions == null)
+    {
+        <div class="spinner-border text-info" role="status"></div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var edition in _editions)
+            {
+                <div class="col-md-6 col-xl-3">
+                    <div class="edition-card @(edition.Sku == "syndicate" ? "featured" : "")">
+                        <div class="eyebrow">@edition.Platform</div>
+                        <h3>@edition.Name</h3>
+                        <div class="edition-price">@(edition.FreeToPlay ? "Free" : edition.PriceUsd.ToString("C"))</div>
+                        <p>@edition.Blurb</p>
+                        @if (!edition.FreeToPlay)
+                        {
+                            <div class="small mb-3">@edition.Coins.ToString("N0") coins</div>
+                        }
+                        @if (edition.FreeToPlay)
+                        {
+                            <a class="btn btn-warning w-100 fw-bold" href="lobby">Play in the browser</a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-warning w-100 fw-bold" disabled="@_busy" @onclick="() => Buy(edition.Sku)">
+                                Buy @edition.Name
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="row g-3 mt-2">
+        <div class="col-md-4">
+            <div class="tip-card">
+                <h5>Phone and tablet</h5>
+                <p>Open Nebula in the browser, then use Add to Home Screen. Sign in with the same commander.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="tip-card">
+                <h5>Windows and Mac</h5>
+                <p>Use the install icon in the address bar. The desktop window is the same match client.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="tip-card">
+                <h5>What the price buys</h5>
+                <p>Coins for the black market and the season. The race itself stays free, so a new player can jump in today.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "success")]
+    public bool SuccessQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "canceled")]
+    public bool CanceledQuery { get; set; }
+
+    private bool _success;
+    private bool _canceled;
+    private bool _busy;
+    private string? _error;
+    private List<EditionDto>? _editions;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _success = SuccessQuery;
+        _canceled = CanceledQuery;
+        try
+        {
+            _editions = await Http.GetFromJsonAsync<List<EditionDto>>("api/editions");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Could not load editions. {ex.Message}";
+            _editions = new();
+        }
+    }
+
+    private async Task Buy(string sku)
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/payments/checkout", new CheckoutBody(sku));
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                Nav.NavigateTo("/");
+                return;
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+            var session = await response.Content.ReadFromJsonAsync<CheckoutSession>();
+            if (!string.IsNullOrEmpty(session?.Url))
+                Nav.NavigateTo(session.Url, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private sealed record CheckoutBody(string Sku);
+    private sealed class CheckoutSession { public string Url { get; set; } = string.Empty; }
+    private sealed class EditionDto
+    {
+        public string Sku { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Platform { get; set; } = string.Empty;
+        public string Blurb { get; set; } = string.Empty;
+        public decimal PriceUsd { get; set; }
+        public int Coins { get; set; }
+        public bool FreeToPlay { get; set; }
+    }
+}

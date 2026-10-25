@@ -33,11 +33,15 @@ namespace Nebula.Server.Services
             // The slow consumer loop
             await foreach (var state in _channel.Reader.ReadAllAsync(stoppingToken))
             {
+                try
+                {
                 // We must create a new scope because DbContext is Scoped, but this worker is a Singleton
                 using var scope = _serviceProvider.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<NebulaDbContext>();
 
-                var winnerId = state.Players.OrderByDescending(p => p.Value.Credits).First().Key;
+                var winnerId = !string.IsNullOrEmpty(state.WinnerId)
+                    ? state.WinnerId
+                    : state.Players.OrderByDescending(p => p.Value.Credits).First().Key;
 
                 // 1. Identify the currently active season
                 var activeSeason = await db.Set<Season>()
@@ -51,8 +55,12 @@ namespace Nebula.Server.Services
 
                     foreach (var playerEntry in state.Players)
                     {
-                        var playerId = Guid.Parse(playerEntry.Key);
-                        var isWinner = playerId.ToString() == winnerId;
+                        if (!Guid.TryParse(playerEntry.Key, out var playerId))
+                            continue;
+                        if (!await db.Players.AnyAsync(p => p.Id == playerId, stoppingToken))
+                            continue;
+
+                        var isWinner = playerEntry.Key == winnerId;
                         
                         // Winners get a 50% XP bonus
                         var xpEarned = isWinner ? (int)(baseXP * 1.5) : baseXP;
@@ -71,13 +79,19 @@ namespace Nebula.Server.Services
                     }
                 }
 
+                if (!Guid.TryParse(state.MatchId, out var matchGuid) || !Guid.TryParse(winnerId, out var winnerGuid))
+                {
+                    Console.WriteLine($"[DB] Skipping match {state.MatchId}: id or winner is not a Guid.");
+                    continue;
+                }
+
                 var record = new MatchRecord
                 {
-                    Id = Guid.Parse(state.MatchId),
-                    WinnerId = Guid.Parse(winnerId),
+                    Id = matchGuid,
+                    WinnerId = winnerGuid,
                     DurationInSeconds = state.CurrentTick / 10, // Assuming 10 ticks/sec
                     EndedAt = DateTime.UtcNow,
-                    ParticipantIds = state.Players.Keys.Select(Guid.Parse).ToList(),
+                    ParticipantIds = state.Players.Keys.Where(id => Guid.TryParse(id, out _)).Select(Guid.Parse).ToList(),
                     FinalStateJson = System.Text.Json.JsonSerializer.Serialize(state),
                     
                     // NEW: Serialize the compressed frame array
@@ -91,7 +105,8 @@ namespace Nebula.Server.Services
                 {
                     var playerIdStr = playerEntry.Key;
                     var playerState = playerEntry.Value;
-                    var playerId = Guid.Parse(playerIdStr);
+                    if (!Guid.TryParse(playerIdStr, out var playerId))
+                        continue;
                     
                     var profile = await db.Players.FindAsync(new object[] { playerId }, cancellationToken: stoppingToken);
                     if (profile != null)
@@ -107,8 +122,21 @@ namespace Nebula.Server.Services
                                 baseReward *= 2;
                             }
                             
-                            // Grant reward to player... (e.g. XP or Credits)
-                            profile.PremiumCredits += baseReward;
+                            var rewardRef = $"{state.MatchId}:win:{playerId}";
+                            var alreadyPaid = await db.Set<PremiumLedgerEntry>()
+                                .AnyAsync(e => e.ReferenceId == rewardRef, stoppingToken);
+                            if (!alreadyPaid)
+                            {
+                                db.Set<PremiumLedgerEntry>().Add(new PremiumLedgerEntry
+                                {
+                                    PlayerId = playerId,
+                                    Amount = baseReward,
+                                    Type = TransactionType.MatchReward,
+                                    ReferenceId = rewardRef
+                                });
+                                profile.PremiumCredits += baseReward;
+                                profile.Version = Guid.NewGuid();
+                            }
                         }
                     }
 
@@ -130,11 +158,10 @@ namespace Nebula.Server.Services
                                 if (playerIdStr == winnerId) quest.CurrentValue += 1;
                                 break;
                             case QuestType.DeployDrones:
-                                // Tally the total drones they had at the end of the match
-                                quest.CurrentValue += (playerState.ActiveIroniumDrones + playerState.ActivePlasmaDrones);
+                                quest.CurrentValue += playerState.DronesDeployed;
                                 break;
                             case QuestType.UseSabotage:
-                                // To do: tracking sabotage usage might require extending the replay frame or state.
+                                quest.CurrentValue += playerState.SabotagesUsed;
                                 break;
                         }
 
@@ -145,10 +172,18 @@ namespace Nebula.Server.Services
                 }
 
                 await db.SaveChangesAsync(stoppingToken);
-                
-                var redisDb = _serviceProvider.GetRequiredService<IConnectionMultiplexer>().GetDatabase();
-                var winnerUsername = state.Players[winnerId].PlayerName; 
-                await redisDb.SortedSetIncrementAsync("leaderboard:wins", winnerUsername, 1);
+
+                try
+                {
+                    var redisDb = _serviceProvider.GetRequiredService<IConnectionMultiplexer>().GetDatabase();
+                    var winnerIsHuman = await db.Players.AsNoTracking().AnyAsync(p => p.Id == winnerGuid, stoppingToken);
+                    if (winnerIsHuman)
+                        await redisDb.SortedSetIncrementAsync("leaderboard:wins", winnerGuid.ToString(), 1);
+                }
+                catch (RedisConnectionException)
+                {
+                    // Leaderboard cache is optional when Redis is offline.
+                }
                 
                 // Check if this was a tournament match (MatchId matches a TournamentMatch.Id)
                 if (Guid.TryParse(state.MatchId, out var parsedMatchId))
@@ -159,7 +194,7 @@ namespace Nebula.Server.Services
 
                     if (tournamentMatch != null && tournamentMatch.State == MatchState.InProgress)
                     {
-                        tournamentMatch.WinnerId = Guid.Parse(winnerId);
+                        tournamentMatch.WinnerId = winnerGuid;
                         tournamentMatch.State = MatchState.Finished;
 
                         // Advance the winner to the next round in the bracket
@@ -197,6 +232,11 @@ namespace Nebula.Server.Services
                 }
 
                 Console.WriteLine($"[DB] Match {state.MatchId} saved to PostgreSQL and Redis.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DB] Failed to persist match {state.MatchId}: {ex.Message}");
+                }
             }
         }
     }

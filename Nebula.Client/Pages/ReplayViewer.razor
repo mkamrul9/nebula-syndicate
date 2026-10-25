@@ -2,6 +2,7 @@
 @page "/replay/{MatchId}"
 @using Nebula.Shared.Models
 @using System.Net.Http.Json
+@implements IDisposable
 @inject HttpClient Http
 
 <div class="container-fluid bg-dark text-light min-vh-100 p-4">

@@ -1,0 +1,188 @@
+@page "/howto"
+@inject NavigationManager Nav
+
+<PageTitle>Tactical Operations & Strategy Guide — Nebula Syndicate</PageTitle>
+
+<div class="nebula-page">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <p class="eyebrow mb-1">COMMAND PRIMER & TACTICAL PLAYBOOK</p>
+            <h1 class="display-5 mb-0">High-Stakes Extraction Strategy</h1>
+            <p class="lead text-muted mb-0">Nebula Syndicate is an asynchronous real-time market duel. You win with timing, information, and resource denial.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-warning fw-bold" @onclick='() => Nav.NavigateTo("/lobby?tutorial=1")'>Play Guided First Match</button>
+            <button class="btn btn-outline-light" @onclick="ReplayBriefing">Interactive Field Briefing</button>
+        </div>
+    </div>
+
+    <!-- The 4 Core Pillars -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="tip-card h-100 p-3 rounded bg-dark border border-secondary">
+                <div class="eyebrow text-cyan mb-1">PILLAR 1</div>
+                <h5 class="text-light">The Race to ₡50k</h5>
+                <p class="small text-muted mb-0">Stockpiles are worthless until converted to currency. The first syndicate to liquidate ₡50,000 wins the match.</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="tip-card h-100 p-3 rounded bg-dark border border-secondary">
+                <div class="eyebrow text-warning mb-1">PILLAR 2</div>
+                <h5 class="text-light">Market Timing</h5>
+                <p class="small text-muted mb-0">Selling when quotes are HOT grants an immediate +12% bonus. Panic-selling on COLD quotes incurs a -12% haircut.</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="tip-card h-100 p-3 rounded bg-dark border border-secondary">
+                <div class="eyebrow text-danger mb-1">PILLAR 3</div>
+                <h5 class="text-light">Sabotage Denial</h5>
+                <p class="small text-muted mb-0">EMP strikes (₡2,000) freeze the opponent for 10 seconds. Market Viruses (₡3,500) corrupt their trading terminal.</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="tip-card h-100 p-3 rounded bg-dark border border-secondary">
+                <div class="eyebrow text-success mb-1">PILLAR 4</div>
+                <h5 class="text-light">Network Shielding</h5>
+                <p class="small text-muted mb-0">Construct Firewalls using raw ore (150 Fe / 50 Pl, 0 credits) to absorb enemy attacks without losing money.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Economy Loop -->
+    <div class="card p-4 mb-4 border border-info bg-black">
+        <h3 class="h5 text-info mb-3">🔄 The Extraction Economic Cycle</h3>
+        <div class="row g-3 text-center align-items-center">
+            <div class="col-md-2">
+                <div class="p-3 rounded border border-warning">
+                    <div class="fs-4">₡</div>
+                    <strong class="text-warning d-block">Credits</strong>
+                    <span class="small text-muted">Spend on drones & tech</span>
+                </div>
+            </div>
+            <div class="col-md-1 fs-3 text-muted">➜</div>
+            <div class="col-md-2">
+                <div class="p-3 rounded border border-cyan">
+                    <div class="fs-4">◆</div>
+                    <strong class="text-cyan d-block">Harvesters</strong>
+                    <span class="small text-muted">Ironium (vol) & Plasma (rich)</span>
+                </div>
+            </div>
+            <div class="col-md-1 fs-3 text-muted">➜</div>
+            <div class="col-md-2">
+                <div class="p-3 rounded border border-secondary">
+                    <div class="fs-4">📦</div>
+                    <strong class="text-light d-block">Stockpiles</strong>
+                    <span class="small text-muted">Accumulate raw ores</span>
+                </div>
+            </div>
+            <div class="col-md-1 fs-3 text-muted">➜</div>
+            <div class="col-md-3">
+                <div class="p-3 rounded border border-success">
+                    <div class="fs-4">📈</div>
+                    <strong class="text-success d-block">Hot Market Trades</strong>
+                    <span class="small text-muted">Sell spikes for ₡50k Victory!</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tactical Decision Trees -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="card p-4 h-100 border border-secondary bg-dark">
+                <h4 class="h5 text-warning mb-3">⚡ When to Execute Sabotage</h4>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-3 d-flex gap-2">
+                        <span class="badge bg-danger mt-1">EMP</span>
+                        <div>
+                            <strong>Opponent Dump Threat:</strong> When the rival card shows a heavy stockpile, they are waiting for a hot quote to cash in. Freeze them immediately to delay their race score.
+                        </div>
+                    </li>
+                    <li class="mb-3 d-flex gap-2">
+                        <span class="badge bg-warning text-dark mt-1">VIRUS</span>
+                        <div>
+                            <strong>Lead Disruption:</strong> When the rival is ahead and has no firewall charges, infect their feed with Market Virus (₡3,500). They will see inverted signals and dump into slumps.
+                        </div>
+                    </li>
+                    <li class="d-flex gap-2">
+                        <span class="badge bg-info text-dark mt-1">SHIELD</span>
+                        <div>
+                            <strong>Preemptive Firewall:</strong> Build a firewall (150 Fe / 50 Pl) the moment you cross ₡20,000. Rivals love to strike when they fall behind.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card p-4 h-100 border border-secondary bg-dark">
+                <h4 class="h5 text-cyan mb-3">🚀 Harvester Scaling & Drone Overcharge</h4>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-3 d-flex gap-2">
+                        <span class="badge bg-cyan text-dark mt-1">Fe</span>
+                        <div>
+                            <strong>Ironium (Volume Ore):</strong> Generates 2.0 units per drone per second. Essential for constructing Firewalls and steady baseline cash flow.
+                        </div>
+                    </li>
+                    <li class="mb-3 d-flex gap-2">
+                        <span class="badge bg-danger mt-1">Pl</span>
+                        <div>
+                            <strong>Plasma (High-Density Ore):</strong> Generates 0.5 units per drone per second, but trades for drastically higher credit amounts. Your main late-game rocket fuel.
+                        </div>
+                    </li>
+                    <li class="d-flex gap-2">
+                        <span class="badge bg-warning text-dark mt-1">BOOST</span>
+                        <div>
+                            <strong>Drone Overcharge (₡1,500):</strong> Doubles harvest yield (2x) for 20 seconds. Use this right after deploying 3+ drones of a single type to flood your stockpile ahead of a market surge.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Common Mistakes to Avoid -->
+    <div class="card p-4 mb-4 border border-danger bg-black">
+        <h4 class="h5 text-danger mb-3">⚠ The 5 Fatal Rookie Mistakes</h4>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark border border-secondary h-100">
+                    <strong class="text-danger d-block mb-1">1. Panic Selling into COLD Markets</strong>
+                    <span class="small text-muted">Clicking "Sell All" whenever you have ore forfeits 12% of its true value every single time. Wait for quotes to turn amber.</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark border border-secondary h-100">
+                    <strong class="text-danger d-block mb-1">2. Spending Down to ₡0 on Drones</strong>
+                    <span class="small text-muted">If you spend all your credits on drones, you cannot afford an EMP when the rival is about to win, nor can you overcharge.</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark border border-secondary h-100">
+                    <strong class="text-danger d-block mb-1">3. Ignoring Firewalls</strong>
+                    <span class="small text-muted">A single EMP disables you for 10 full seconds (zero harvest, zero trade). Firewalls cost only ore — keep 1 charge active at all times.</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="p-3 rounded bg-dark border border-secondary h-100">
+                    <strong class="text-danger d-block mb-1">4. Random EMP Strikes</strong>
+                    <span class="small text-muted">EMP costs ₡2,000. Firing it when the opponent has 0 ore in stock wastes your currency. Fire only when Dump Threat is visible.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Action Bar -->
+    <div class="d-flex gap-3 justify-content-center flex-wrap mt-4">
+        <button class="btn btn-warning btn-lg fw-bold px-4" @onclick='() => Nav.NavigateTo("/lobby?tutorial=1")'>Launch Guided Match</button>
+        <button class="btn btn-outline-info btn-lg fw-bold px-4" @onclick="ReplayBriefing">Open Field Manual</button>
+        <button class="btn btn-outline-light btn-lg px-4" @onclick='() => Nav.NavigateTo("/lobby")'>Return to Lobby</button>
+    </div>
+
+    <HowToPlayTutorial @ref="_tutorial" />
+</div>
+
+@code {
+    private HowToPlayTutorial? _tutorial;
+
+    private void ReplayBriefing() => _tutorial?.Open();
+}

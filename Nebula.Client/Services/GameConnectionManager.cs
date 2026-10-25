@@ -4,6 +4,8 @@ using Blazored.LocalStorage;
 using Nebula.Shared.Models;
 using Nebula.Shared.Interfaces;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 namespace Nebula.Client.Services
 {
@@ -20,20 +22,28 @@ namespace Nebula.Client.Services
         public event Action<string>? OnMatchJoined;
         public event Action<NotificationPayload>? OnGlobalNotificationReceived;
         public event Action<GameState>? OnSpectatorTickReceived;
+
+        // New gameplay events
+        public event Action<string, int, decimal>? OnComboAlert;           // (playerId, streakCount, multiplier)
+        public event Action<string, string>? OnPowerSurgeActivated;        // (playerId, playerName)
+        public event Action<string, string>? OnMatchAlert;                  // (alertType, message)
         
         public string CurrentRegion { get; private set; } = "Unknown";
         public event Action? OnStateChanged;
         
         public bool IsConnected => _hubConnection.State == HubConnectionState.Connected;
 
-        public GameConnectionManager(ILocalStorageService localStorage, NavigationManager navManager)
+        public GameConnectionManager(ILocalStorageService localStorage, NavigationManager navManager, IConfiguration configuration)
         {
             _localStorage = localStorage;
             _navManager = navManager;
 
+            var apiBase = configuration["ApiBaseUrl"];
+            if (string.IsNullOrWhiteSpace(apiBase))
+                apiBase = "http://localhost:5168/";
+
             _hubConnection = new HubConnectionBuilder()
-                // Assuming the server is running on the same domain/port for now
-                .WithUrl("http://localhost:5168/gamehub", options =>
+                .WithUrl($"{apiBase.TrimEnd('/')}/gamehub", options =>
                 {
                     // Dynamically provide the JWT for authentication
                     options.AccessTokenProvider = async () => 
@@ -87,6 +97,21 @@ namespace Nebula.Client.Services
                 await _hubConnection.StopAsync();
                 _navManager.NavigateTo($"/suspended?reason={Uri.EscapeDataString(reason)}");
             });
+
+            _hubConnection.On<string, int, decimal>(nameof(IGameClient.ReceiveComboAlert), (playerId, streak, mult) =>
+            {
+                OnComboAlert?.Invoke(playerId, streak, mult);
+            });
+
+            _hubConnection.On<string, string>(nameof(IGameClient.ReceivePowerSurgeActivated), (playerId, playerName) =>
+            {
+                OnPowerSurgeActivated?.Invoke(playerId, playerName);
+            });
+
+            _hubConnection.On<string, string>(nameof(IGameClient.ReceiveMatchAlert), (alertType, message) =>
+            {
+                OnMatchAlert?.Invoke(alertType, message);
+            });
         }
 
         public async Task ConnectAsync()
@@ -94,6 +119,7 @@ namespace Nebula.Client.Services
             if (_hubConnection.State == HubConnectionState.Disconnected)
             {
                 await _hubConnection.StartAsync();
+                OnStateChanged?.Invoke();
             }
         }
 
@@ -101,7 +127,15 @@ namespace Nebula.Client.Services
         {
             if (IsConnected)
             {
-                await _hubConnection.SendAsync("DispatchDrone", targetResource);
+                await _hubConnection.InvokeAsync("DispatchDrone", targetResource);
+            }
+        }
+
+        public async Task SellResourceAsync(string resource, double amount)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.InvokeAsync("SellResource", resource, amount);
             }
         }
 
@@ -109,7 +143,7 @@ namespace Nebula.Client.Services
         {
             if (IsConnected)
             {
-                await _hubConnection.SendAsync("LaunchSabotage", targetPlayerId, sabotageType);
+                await _hubConnection.InvokeAsync("LaunchSabotage", targetPlayerId, sabotageType);
             }
         }
 
@@ -117,25 +151,65 @@ namespace Nebula.Client.Services
         {
             if (IsConnected)
             {
-                await _hubConnection.SendAsync("BuildDefense", type);
+                await _hubConnection.InvokeAsync("BuildDefense", type);
+            }
+        }
+
+        public async Task DroneOverchargeAsync(string targetResource)
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.InvokeAsync("DroneOvercharge", targetResource);
+            }
+        }
+
+        public async Task ActivatePowerSurgeAsync()
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.InvokeAsync("ActivatePowerSurge");
+            }
+        }
+
+        public async Task EmergencySellAsync()
+        {
+            if (IsConnected)
+            {
+                await _hubConnection.InvokeAsync("EmergencySell");
             }
         }
 
         // Method for the UI to send commands to the server
+        public async Task StartTutorialMatchAsync()
+        {
+            if (!IsConnected)
+                throw new InvalidOperationException("Not connected to the syndicate servers.");
+
+            await _hubConnection.InvokeAsync("StartTutorialMatch");
+        }
+
         public async Task JoinMatchQueue()
         {
-            if (IsConnected)
-            {
-                await _hubConnection.SendAsync("JoinMatchQueue");
-            }
+            if (!IsConnected)
+                throw new InvalidOperationException("Not connected to the syndicate servers.");
+
+            await _hubConnection.InvokeAsync("JoinMatchQueue");
+        }
+
+        public async Task EnterMatchAsync(string matchId)
+        {
+            if (!IsConnected)
+                throw new InvalidOperationException("Not connected to the syndicate servers.");
+
+            await _hubConnection.InvokeAsync("EnterMatch", matchId);
         }
 
         public async Task StartWatchingMatchAsync(string matchId)
         {
-            if (IsConnected)
-            {
-                await _hubConnection.SendAsync("WatchMatch", matchId);
-            }
+            if (!IsConnected)
+                throw new InvalidOperationException("Not connected to the syndicate servers.");
+
+            await _hubConnection.InvokeAsync("WatchMatch", matchId);
         }
 
         public async Task SendChatMessage(string message, string channel)
@@ -152,16 +226,20 @@ namespace Nebula.Client.Services
             if (string.IsNullOrEmpty(token)) return string.Empty;
 
             // Decode JWT payload (without validation, as server handles real security)
-            var payload = token.Split('.')[1];
-            var jsonBytes = ParseBase64WithoutPadding(payload);
-            var keyValuePairs = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
-            
-            // "sub" is the standard JWT claim for Subject/UserId
-            return keyValuePairs?["sub"]?.ToString() ?? string.Empty;
+            var parts = token.Split('.');
+            if (parts.Length < 2) return string.Empty;
+
+            var jsonBytes = ParseBase64Url(parts[1]);
+            using var document = JsonDocument.Parse(jsonBytes);
+            if (document.RootElement.TryGetProperty("sub", out var subject))
+                return subject.GetString() ?? string.Empty;
+
+            return string.Empty;
         }
 
-        private byte[] ParseBase64WithoutPadding(string base64)
+        private static byte[] ParseBase64Url(string base64)
         {
+            base64 = base64.Replace('-', '+').Replace('_', '/');
             switch (base64.Length % 4)
             {
                 case 2: base64 += "=="; break;

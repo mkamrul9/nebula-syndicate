@@ -28,5 +28,12 @@ namespace Nebula.Shared.Interfaces
         
         // Moderation
         Task ForceDisconnect(string reason);
+
+        // Combo streak and power events
+        Task ReceiveComboAlert(string playerId, int streakCount, decimal multiplier);
+        Task ReceivePowerSurgeActivated(string playerId, string playerName);
+
+        // Match-wide countdown alerts (e.g., final 60s warning)
+        Task ReceiveMatchAlert(string alertType, string message);
     }
 }

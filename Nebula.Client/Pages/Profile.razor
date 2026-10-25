@@ -3,13 +3,22 @@
 @using Nebula.Shared.Models
 @using System.Net.Http.Json
 @inject HttpClient Http
+@inject NavigationManager Nav
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
 
-<div class="container mt-4 text-light">
+<div class="nebula-page">
     <h2 class="text-warning mb-4">Commander Profile</h2>
 
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
     @if (_stats == null)
     {
-        <div class="spinner-border text-primary" role="status"></div>
+        @if (string.IsNullOrEmpty(_error))
+        {
+            <div class="spinner-border text-primary" role="status"></div>
+        }
     }
     else
     {
@@ -80,30 +89,110 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-12 mt-4">
+            <div class="card bg-dark border-warning text-white">
+                <div class="card-header fw-bold">Daily Contracts</div>
+                <div class="card-body">
+                    @if (_quests.Count == 0)
+                    {
+                        <div class="text-muted">No active contracts.</div>
+                    }
+                    @foreach (var quest in _quests)
+                    {
+                        <div class="d-flex justify-content-between align-items-center border-bottom border-secondary py-2">
+                            <div>
+                                <div>@quest.Description</div>
+                                <small class="text-muted">@quest.CurrentValue / @quest.TargetValue · @quest.RewardCredits coins</small>
+                            </div>
+                            @if (quest.IsClaimed)
+                            {
+                                <span class="badge bg-secondary">CLAIMED</span>
+                            }
+                            else if (quest.IsCompleted)
+                            {
+                                <button class="btn btn-sm btn-warning" @onclick="() => ClaimQuest(quest.Id)">CLAIM</button>
+                            }
+                            else
+                            {
+                                <span class="badge bg-dark border border-secondary">IN PROGRESS</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
     }
 </div>
 
 @code {
     private PlayerStatsDto? _stats;
     private List<MatchHistoryItemDto> _history = new();
+    private List<QuestDto> _quests = new();
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
-        // Requires the HttpClient in Program.cs to be configured with a DelegatingHandler 
-        // that automatically attaches the JWT bearer token from LocalStorage to outbound requests.
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            _error = "Sign in from Login to open your profile.";
+            return;
+        }
+
         try
         {
-            _stats = await Http.GetFromJsonAsync<PlayerStatsDto>("api/profile/stats");
-            
+            var statsResponse = await Http.GetAsync("api/profile/stats");
+            if (statsResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _error = "Session expired. Sign in again from Login.";
+                return;
+            }
+            if (!statsResponse.IsSuccessStatusCode)
+            {
+                _error = await statsResponse.Content.ReadAsStringAsync();
+                return;
+            }
+
+            _stats = await statsResponse.Content.ReadFromJsonAsync<PlayerStatsDto>();
+
             var historyData = await Http.GetFromJsonAsync<List<MatchHistoryItemDto>>("api/profile/history?page=1&pageSize=10");
             if (historyData != null)
-            {
                 _history = historyData;
-            }
+
+            var quests = await Http.GetFromJsonAsync<List<QuestDto>>("api/quests");
+            if (quests != null)
+                _quests = quests;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching profile data: {ex.Message}");
+            _error = $"Could not load profile. {ex.Message}";
         }
+    }
+
+    private async Task ClaimQuest(Guid questId)
+    {
+        var response = await Http.PostAsync($"api/quests/{questId}/claim", null);
+        if (!response.IsSuccessStatusCode)
+        {
+            _error = "Could not claim that contract.";
+            return;
+        }
+
+        _error = null;
+        var quests = await Http.GetFromJsonAsync<List<QuestDto>>("api/quests");
+        if (quests != null)
+            _quests = quests;
+    }
+
+    private sealed class QuestDto
+    {
+        public Guid Id { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public int TargetValue { get; set; }
+        public int CurrentValue { get; set; }
+        public int RewardCredits { get; set; }
+        public bool IsClaimed { get; set; }
+        public bool IsCompleted { get; set; }
     }
 }

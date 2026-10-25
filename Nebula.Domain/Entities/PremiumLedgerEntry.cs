@@ -26,6 +26,7 @@ namespace Nebula.Domain.Entities
         QuestReward,
         AdminGrant,
         StorePurchase,
-        GuildVaultDonation
+        GuildVaultDonation,
+        MatchReward
     }
 }

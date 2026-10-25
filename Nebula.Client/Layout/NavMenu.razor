@@ -1,44 +1,112 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Nebula.Client</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager Nav
+@implements IDisposable
+
+<aside class="side-rail">
+    <div class="side-rail-brand">
+        <NavLink class="brand-link" href="@HomeHref" Match="NavLinkMatch.All" @onclick="CloseMenu">
+            <span class="brand-mark-side">NEBULA</span>
+            <span class="brand-sub">Syndicate</span>
+        </NavLink>
+        <button type="button" class="side-toggle" title="Menu" aria-label="Toggle navigation" @onclick="ToggleMenu">
+            <span></span><span></span><span></span>
         </button>
     </div>
-</div>
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-box-arrow-in-right-nav-menu" aria-hidden="true"></span> Login
+    <div class="side-rail-body @(_menuOpen ? "is-open" : null)" @onclick="CloseMenu">
+        <nav class="side-nav" @onclick:stopPropagation="true">
+            <p class="side-label">Play</p>
+            @if (_loggedIn)
+            {
+                <NavLink class="side-link" href="lobby" @onclick="CloseMenu">
+                    <span class="side-ico lobby"></span> Lobby
+                </NavLink>
+                <NavLink class="side-link" href="lobby?tutorial=1" @onclick="CloseMenu">
+                    <span class="side-ico guide"></span> Guided match
+                </NavLink>
+            }
+            else
+            {
+                <NavLink class="side-link" href="" Match="NavLinkMatch.All" @onclick="CloseMenu">
+                    <span class="side-ico login"></span> Login
+                </NavLink>
+            }
+
+            <p class="side-label">Learn</p>
+            <NavLink class="side-link" href="howto" @onclick="CloseMenu">
+                <span class="side-ico book"></span> How to play
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="lobby">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Lobby
+
+            <p class="side-label">Commander</p>
+            <NavLink class="side-link" href="profile" @onclick="CloseMenu">
+                <span class="side-ico profile"></span> Profile
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="profile">
-                <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> Profile
+            <NavLink class="side-link" href="store" @onclick="CloseMenu">
+                <span class="side-ico store"></span> Store
             </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="leaderboard">
-                <span class="bi bi-trophy-fill-nav-menu" aria-hidden="true"></span> Leaderboard
+            <NavLink class="side-link" href="editions" @onclick="CloseMenu">
+                <span class="side-ico gem"></span> Get Nebula
             </NavLink>
-        </div>
-    </nav>
-</div>
+            <NavLink class="side-link" href="leaderboard" @onclick="CloseMenu">
+                <span class="side-ico trophy"></span> Leaderboard
+            </NavLink>
+
+            @if (_loggedIn)
+            {
+                <div class="side-foot">
+                    <button type="button" class="side-signout" @onclick="SignOut">Sign out</button>
+                </div>
+            }
+        </nav>
+    </div>
+</aside>
 
 @code {
-    private bool collapseNavMenu = true;
+    private bool _menuOpen;
+    private bool _loggedIn;
 
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private string HomeHref => _loggedIn ? "lobby" : "";
 
-    private void ToggleNavMenu()
+    protected override async Task OnInitializedAsync()
     {
-        collapseNavMenu = !collapseNavMenu;
+        Nav.LocationChanged += OnLocationChanged;
+        await RefreshAuthAsync();
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _menuOpen = false;
+        await RefreshAuthAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshAuthAsync()
+    {
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            _loggedIn = !string.IsNullOrWhiteSpace(token);
+        }
+        catch
+        {
+            _loggedIn = false;
+        }
+    }
+
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+
+    private void CloseMenu() => _menuOpen = false;
+
+    private async Task SignOut()
+    {
+        await LocalStorage.RemoveItemAsync("authToken");
+        _loggedIn = false;
+        _menuOpen = false;
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
     }
 }

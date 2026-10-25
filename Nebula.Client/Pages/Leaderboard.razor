@@ -3,10 +3,14 @@
 @using System.Net.Http.Json
 @inject HttpClient Http
 
-<div class="container mt-4 text-light">
-    <h2 class="text-warning mb-4 text-center">GLOBAL SYNDICATE RANKINGS</h2>
+<div class="nebula-page">
+    <h2 class="text-warning mb-4 text-center">Global syndicate rankings</h2>
 
-    @if (_leaderboard == null)
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_leaderboard == null)
     {
         <div class="d-flex justify-content-center">
             <div class="spinner-border text-warning" role="status"></div>
@@ -45,6 +49,7 @@
 
 @code {
     private List<LeaderboardEntry>? _leaderboard;
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -54,7 +59,8 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error fetching leaderboard: {ex.Message}");
+            _error = $"Could not load rankings. {ex.Message}";
+            _leaderboard = new();
         }
     }
 

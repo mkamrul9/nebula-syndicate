@@ -1,0 +1,288 @@
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NavigationManager NavManager
+
+@if (_visible)
+{
+    <div class="tutorial-scrim" @onclick="DismissBackdrop">
+        <div class="tutorial-card" @onclick:stopPropagation="true">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                <div>
+                    <p class="eyebrow mb-1">FIELD MANUAL & TACTICAL SIMULATOR · STEP @(_stepIndex + 1) OF @_steps.Length</p>
+                    <h2 class="h3 mb-0">@_steps[_stepIndex].Title</h2>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-light" @onclick="Skip">Close</button>
+            </div>
+
+            <!-- Quick Navigation Grid -->
+            <div class="tutorial-section-grid mb-3">
+                @for (var i = 0; i < _steps.Length; i++)
+                {
+                    var idx = i;
+                    <div class="tutorial-section-tab @(idx == _stepIndex ? "active" : null)" @onclick="() => SelectStep(idx)">
+                        @_steps[idx].ShortTitle
+                    </div>
+                }
+            </div>
+
+            <!-- Visual Glyph / Animation Area -->
+            <div class="tutorial-visual @_steps[_stepIndex].Accent mb-3">
+                <span class="fs-1">@_steps[_stepIndex].Glyph</span>
+            </div>
+
+            <!-- Body and Strategy Hint -->
+            <p class="tutorial-body mb-2">@_steps[_stepIndex].Body</p>
+            <div class="p-2 rounded bg-dark border border-secondary mb-3">
+                <strong class="text-warning small d-block">PRO STRATEGY:</strong>
+                <span class="tutorial-hint small text-light">@_steps[_stepIndex].Hint</span>
+            </div>
+
+            <!-- Interactive Practice Sandbox for Key Steps -->
+            @if (_stepIndex == 1)
+            {
+                <!-- Drone Simulation -->
+                <div class="p-3 mb-3 rounded border border-info bg-black text-center">
+                    <h6 class="text-info mb-2">PRACTICE LAB: DRONE DEPLOYMENT</h6>
+                    <div class="d-flex justify-content-center gap-3 align-items-center mb-2">
+                        <span>Active Harvesters: <strong class="text-warning">@_demoDrones</strong></span>
+                        <span>Stockpile: <strong class="text-info">@_demoStock Fe</strong></span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-info" @onclick="DemoDeployDrone">Deploy Practice Drone (+₡500)</button>
+                </div>
+            }
+            else if (_stepIndex == 2)
+            {
+                <!-- Market Timing Simulation -->
+                <div class="p-3 mb-3 rounded border border-warning bg-black text-center">
+                    <h6 class="text-warning mb-2">PRACTICE LAB: MARKET TIMING</h6>
+                    <div class="d-flex justify-content-center gap-4 align-items-center mb-2">
+                        <div>
+                            Market State: <strong class="@(_demoMarketHot ? "text-warning" : "text-primary")">@(_demoMarketHot ? "🔥 HOT (+12% SPIKE)" : "❄ COLD (-12% GLUT)")</strong>
+                        </div>
+                        <div>
+                            Result: <strong class="text-success">₡@_demoMarketPayout</strong>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-outline-light" @onclick="ToggleDemoMarket">Toggle Market Surge/Crash</button>
+                        <button class="btn btn-sm btn-warning fw-bold" @onclick="DemoSell">Execute Sell (10 Ore)</button>
+                    </div>
+                </div>
+            }
+            else if (_stepIndex == 3)
+            {
+                <!-- Overcharge Simulation -->
+                <div class="p-3 mb-3 rounded border border-warning bg-black text-center">
+                    <h6 class="text-warning mb-2">PRACTICE LAB: DRONE OVERCHARGE</h6>
+                    <p class="small text-muted mb-2">Overcharge doubles output from 2.0/s to 4.0/s for 20 seconds.</p>
+                    <div class="d-flex justify-content-center gap-3 align-items-center mb-2">
+                        <span>Speed: <strong class="@(_demoOvercharged ? "text-warning" : "text-muted")">@(_demoOvercharged ? "⚡ 2X OVERCHARGED" : "1X Standard")</strong></span>
+                    </div>
+                    <button class="btn btn-sm btn-warning" disabled="@_demoOvercharged" @onclick="DemoTriggerOvercharge">
+                        @(_demoOvercharged ? "Overcharge Active!" : "Activate Overcharge")
+                    </button>
+                </div>
+            }
+            else if (_stepIndex == 4 || _stepIndex == 5)
+            {
+                <!-- Combat / Firewall Simulation -->
+                <div class="p-3 mb-3 rounded border border-danger bg-black text-center">
+                    <h6 class="text-danger mb-2">PRACTICE LAB: EMP VS FIREWALL</h6>
+                    <div class="d-flex justify-content-center gap-4 align-items-center mb-2">
+                        <span>Shields: <strong class="text-info">🛡️ @_demoFirewalls</strong></span>
+                        <span>Terminal: <strong class="@(_demoEmpDisabled ? "text-danger" : "text-success")">@(_demoEmpDisabled ? "OFFLINE (EMP MUTED)" : "ONLINE")</strong></span>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2">
+                        <button class="btn btn-sm btn-outline-info" @onclick="DemoAddFirewall">Build Firewall</button>
+                        <button class="btn btn-sm btn-danger" @onclick="DemoFireEmp">Fire Test EMP</button>
+                    </div>
+                </div>
+            }
+
+            <!-- Step Dots -->
+            <div class="tutorial-dots my-2" aria-hidden="true">
+                @for (var i = 0; i < _steps.Length; i++)
+                {
+                    <span class="@(i == _stepIndex ? "active" : null)"></span>
+                }
+            </div>
+
+            <!-- Footer Controls -->
+            <div class="d-flex justify-content-between align-items-center gap-2 mt-3 flex-wrap">
+                <button type="button" class="btn btn-outline-light" disabled="@(_stepIndex == 0)" @onclick="Back">Back</button>
+                <div class="d-flex gap-2">
+                    @if (_stepIndex < _steps.Length - 1)
+                    {
+                        <button type="button" class="btn btn-warning fw-bold px-4" @onclick="Next">Next</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-success fw-bold px-4" @onclick="StartGuidedMatch">Play Guided First Match</button>
+                        <button type="button" class="btn btn-warning fw-bold px-4" @onclick="Finish">Enter Lobby</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public const string StorageKey = "nebula.tutorial.done";
+
+    [Parameter]
+    public bool AutoShow { get; set; }
+
+    [Parameter]
+    public EventCallback OnCompleted { get; set; }
+
+    private bool _visible;
+    private int _stepIndex;
+
+    // Sandbox mini-game states
+    private int _demoDrones = 2;
+    private int _demoStock = 40;
+    private bool _demoMarketHot = true;
+    private int _demoMarketPayout = 0;
+    private bool _demoOvercharged = false;
+    private int _demoFirewalls = 1;
+    private bool _demoEmpDisabled = false;
+
+    private static readonly TutorialStep[] _steps =
+    {
+        new("The race", "The Race to ₡50,000", "₡", "amber",
+            "You and a rival syndicate compete to extract ₡50,000 in credits first. Both start with starting drones and a small working bank. The race bar at the top of the arena is the only scoreboard that matters.",
+            "Watch your lead line. Don't worry about raw actions per minute — the winner is who turns mined ore into peak credits and denies enemy cash-ins."),
+
+        new("Drones", "Deploy Harvester Drones", "◆", "cyan",
+            "Drones automatically mine resources every second. Ironium (Fe) costs ₡500 and delivers high-volume production. Plasma (Pl) costs ₡500 and yields denser high-value ore.",
+            "Maintain an economy balance. Having 3 Ironium and 2 Plasma drones is a rock-solid opening. Never spend your last ₡1,000 on drones or you can't fight."),
+
+        new("Market timing", "Market Mastery: Hot vs Cold", "↗", "hot",
+            "Resources in stockpiles have zero race value until sold. Every second, the market moves. When a resource is HOT (+12%), sell for an immediate timing bonus. Selling during a COLD slump (−12%) wastes your lead.",
+            "Watch the timing edge counter on your panel. Successful players hold ore until the quote turns amber/HOT, then sell in chunks of 10 or half."),
+
+        new("Overcharge", "Drone Overcharge Boost", "⚡", "amber",
+            "Spend ₡1,500 to activate Drone Overcharge on either Ironium or Plasma. For 20 seconds (200 ticks), all active harvesters of that type harvest at 2x double speed!",
+            "Overcharge right before an anticipated market surge, or when you have 4+ drones deployed to double your extraction snowball."),
+
+        new("EMP Combat", "Tactical Combat: EMP Sabotage", "⚡", "magenta",
+            "Spend ₡2,000 to launch an electromagnetic pulse directly at the rival syndicate. A successful hit knocks their terminal completely offline for 10 seconds, halting all mining and selling.",
+            "Never fire an EMP blindly. Fire when you see 'Dump Threat' on the rival's intel card — freezing them right when they attempt a massive liquidation!"),
+
+        new("Firewalls", "Network Defense: Firewalls", "🛡️", "cyan",
+            "Build a Firewall defense for 150 Ironium and 50 Plasma. Firewalls consume zero credits and automatically intercept incoming EMP strikes and Market Viruses, neutralizing the attack completely.",
+            "Always keep at least 1 Firewall charge ready once you pass ₡20,000. Rivals love to strike when you lead."),
+
+        new("Market Virus", "Subterfuge: Market Virus", "☣", "magenta",
+            "Spend ₡3,500 to inject a Market Virus into the opponent's data feed. For 15 seconds, their live market display becomes corrupted and inverted, leading them to misread prices and panic sell into slumps.",
+            "Firewalls will quarantine viruses. Launch Market Virus after their firewall is stripped to induce catastrophic trading errors."),
+
+        new("Market Shocks", "Dynamic Market Events", "▲", "hot",
+            "Every 20 seconds, dynamic shocks rock the exchange: Gold Rush (all markets surge +25%), Supply Chain Collapses (all dump -22%), or Market Inversions (Ironium and Plasma rates swap!).",
+            "A countdown timer shows how long shocks last. Sell during Gold Rushes and accumulate stockpiles during market crashes."),
+
+        new("Dump Threats", "Reading Dump Threats & Denial", "👁", "cyan",
+            "The rival intel panel tracks opponent stockpile estimates and threat levels. When you see 'DUMP THREAT: Massive stockpile detected', their ore is about to turn into a massive race leap.",
+            "Dump threat is your kill trigger: fire EMP immediately to freeze their sell, then dump your own stockpile into the market!"),
+
+        new("Ready to Battle", "Ready for Extraction", "▶", "cyan",
+            "You have the tactical edge. Queue in Ranked matches or practice in a Guided First Match with an in-arena interactive coach.",
+            "Play Guided First Match if this is your first time. Daily contracts and achievements reward Syndicate Coins on your profile!")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!AutoShow) return;
+        var done = await LocalStorage.GetItemAsync<bool?>(StorageKey);
+        if (done != true)
+            Open();
+    }
+
+    public void Open()
+    {
+        _stepIndex = 0;
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private void SelectStep(int index)
+    {
+        if (index >= 0 && index < _steps.Length)
+            _stepIndex = index;
+    }
+
+    private void Next()
+    {
+        if (_stepIndex < _steps.Length - 1)
+            _stepIndex++;
+    }
+
+    private void Back()
+    {
+        if (_stepIndex > 0)
+            _stepIndex--;
+    }
+
+    private void DemoDeployDrone()
+    {
+        _demoDrones++;
+        _demoStock += 20;
+    }
+
+    private void ToggleDemoMarket()
+    {
+        _demoMarketHot = !_demoMarketHot;
+    }
+
+    private void DemoSell()
+    {
+        var basePrice = 25;
+        var rate = _demoMarketHot ? 1.12 : 0.88;
+        _demoMarketPayout = (int)(10 * basePrice * rate);
+    }
+
+    private void DemoTriggerOvercharge()
+    {
+        _demoOvercharged = true;
+        _ = Task.Delay(4000).ContinueWith(_ => { _demoOvercharged = false; InvokeAsync(StateHasChanged); });
+    }
+
+    private void DemoAddFirewall()
+    {
+        _demoFirewalls++;
+    }
+
+    private void DemoFireEmp()
+    {
+        if (_demoFirewalls > 0)
+        {
+            _demoFirewalls--;
+        }
+        else
+        {
+            _demoEmpDisabled = true;
+            _ = Task.Delay(3000).ContinueWith(_ => { _demoEmpDisabled = false; InvokeAsync(StateHasChanged); });
+        }
+    }
+
+    private async Task Skip() => await CloseAsync();
+
+    private async Task Finish() => await CloseAsync();
+
+    private async Task DismissBackdrop() => await CloseAsync();
+
+    private async Task StartGuidedMatch()
+    {
+        await CloseAsync();
+        NavManager.NavigateTo("/lobby?tutorial=1");
+    }
+
+    private async Task CloseAsync()
+    {
+        _visible = false;
+        await LocalStorage.SetItemAsync(StorageKey, true);
+        await OnCompleted.InvokeAsync();
+    }
+
+    private sealed record TutorialStep(string ShortTitle, string Title, string Glyph, string Accent, string Body, string Hint);
+}

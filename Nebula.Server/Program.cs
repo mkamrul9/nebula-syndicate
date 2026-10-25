@@ -20,16 +20,19 @@ using Nebula.Shared.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add PostgreSQL DbContext
+// Local Development uses a file DB so login works without Docker Postgres.
 builder.Services.AddDbContext<NebulaDbContext>(options =>
-    options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        // Tell EF Core where to output the migration files
-        b => b.MigrationsAssembly("Nebula.Server") 
-    ));
+{
+    options.UseInMemoryDatabase("NebulaDB");
+});
 
-var redisConnection = builder.Configuration.GetConnectionString("Redis");
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection!));
+var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379,abortConnect=false";
+var redisOptions = ConfigurationOptions.Parse(redisConnection);
+redisOptions.AbortOnConnectFail = false;
+redisOptions.ConnectTimeout = builder.Environment.IsDevelopment() ? 500 : 5000;
+var redisMux = ConnectionMultiplexer.Connect(redisOptions);
+builder.Services.AddSingleton<IConnectionMultiplexer>(redisMux);
+var redisReady = redisMux.IsConnected;
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -84,6 +87,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
+var corsOrigins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>()
+    ?? new[] { "http://localhost:5094", "https://localhost:7009" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("GameClient", policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 // Configure OpenTelemetry
 builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics =>
@@ -98,19 +115,23 @@ builder.Services.AddOpenTelemetry()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add SignalR services
-builder.Services.AddSignalR(options =>
+// Add SignalR services. Redis backplane is optional — a single local node works without it.
+var signalRBuilder = builder.Services.AddSignalR(options =>
     {
-        // Keep the heartbeat fast for real-time responsiveness
         options.KeepAliveInterval = TimeSpan.FromSeconds(5);
         options.ClientTimeoutInterval = TimeSpan.FromSeconds(15);
-    })
-    .AddStackExchangeRedis(redisConnection!, options =>
+    });
+if (redisReady)
+{
+    signalRBuilder.AddStackExchangeRedis(redisConnection, options =>
     {
-        // Prefix prevents channel collisions if you run multiple environments 
-        // (e.g., Staging and Prod) on the same Redis cluster.
-        options.Configuration.ChannelPrefix = "Nebula_Prod";
-    }); 
+        options.Configuration.ChannelPrefix = RedisChannel.Literal("Nebula_Prod");
+    });
+}
+else
+{
+    Console.WriteLine("[LiveOps] Redis is offline. Running SignalR in single-node mode.");
+} 
 
 // Add the GameStateManager as a Singleton so we can hold the live state in RAM
 builder.Services.AddSingleton<GameStateManager>();
@@ -140,6 +161,13 @@ StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<NebulaDbContext>();
+    db.Database.EnsureCreated();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -147,10 +175,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors("GameClient");
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 
 app.MapPost("/api/auth/login", async (LoginDto request, NebulaDbContext db, IConfiguration config) =>
 {
@@ -174,6 +204,8 @@ app.MapPost("/api/auth/login", async (LoginDto request, NebulaDbContext db, ICon
     {
         return Results.Unauthorized();
     }
+
+    await EnsureDailyQuestsAsync(db, user.Id);
 
     // Create claims
     var claims = new[]
@@ -247,21 +279,56 @@ api.MapGet("/history", async (ClaimsPrincipal user, NebulaDbContext db, int page
     return Results.Ok(history);
 });
 
-app.MapGet("/api/leaderboard", async (IConnectionMultiplexer redis) =>
+app.MapGet("/api/leaderboard", async (IConnectionMultiplexer redis, NebulaDbContext dbContext) =>
 {
-    var db = redis.GetDatabase();
-    
-    // Fetch the top 50 players (0 to 49) in descending order
-    var topPlayers = await db.SortedSetRangeByRankWithScoresAsync("leaderboard:wins", 0, 49, Order.Descending);
+    try
+    {
+        var db = redis.GetDatabase();
+        var topPlayers = await db.SortedSetRangeByRankWithScoresAsync("leaderboard:wins", 0, 49, Order.Descending);
+        if (topPlayers.Length > 0)
+        {
+            var ids = topPlayers
+                .Select(entry => entry.Element.ToString())
+                .Where(key => Guid.TryParse(key, out _))
+                .Select(Guid.Parse)
+                .ToList();
 
-    var result = topPlayers.Select((entry, index) => new
+            var names = await dbContext.Players
+                .AsNoTracking()
+                .Where(p => ids.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id.ToString(), p => p.Username);
+
+            return Results.Ok(topPlayers.Select((entry, index) =>
+            {
+                var key = entry.Element.ToString();
+                var username = names.TryGetValue(key, out var name) ? name : key;
+                return new
+                {
+                    Rank = index + 1,
+                    Username = username,
+                    Wins = (int)entry.Score
+                };
+            }));
+        }
+    }
+    catch (RedisConnectionException)
+    {
+        // Fall through to SQL when Redis is down locally.
+    }
+
+    var fromSql = await dbContext.Players
+        .AsNoTracking()
+        .OrderByDescending(p => p.TotalWins)
+        .Take(50)
+        .Select(p => new { p.Username, p.TotalWins })
+        .ToListAsync();
+
+    return Results.Ok(fromSql.Select((p, index) => new
     {
         Rank = index + 1,
-        Username = entry.Element.ToString(),
-        Wins = (int)entry.Score
-    });
-
-    return Results.Ok(result);
+        Username = p.Username,
+        Wins = p.TotalWins
+    }));
 });
 
 app.MapGet("/api/replay/{matchId}", async (Guid matchId, NebulaDbContext db) =>
@@ -366,71 +433,156 @@ guildApi.MapPost("/vault/donate", async (DonateDto request, ClaimsPrincipal user
 
 var questApi = app.MapGroup("/api/quests").RequireAuthorization();
 
+questApi.MapGet("/", async (ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    await EnsureDailyQuestsAsync(db, userId);
+
+    var quests = await db.PlayerQuests.AsNoTracking()
+        .Where(q => q.PlayerId == userId && q.ExpirationDateUTC > DateTime.UtcNow)
+        .OrderBy(q => q.Type)
+        .Select(q => new
+        {
+            q.Id,
+            q.Description,
+            q.TargetValue,
+            q.CurrentValue,
+            q.RewardCredits,
+            q.IsClaimed,
+            IsCompleted = q.CurrentValue >= q.TargetValue
+        })
+        .ToListAsync();
+
+    return Results.Ok(quests);
+});
+
 questApi.MapPost("/{questId}/claim", async (Guid questId, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
 {
     var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
-    
-    var quest = await db.Set<PlayerQuest>().FirstOrDefaultAsync(q => q.Id == questId && q.PlayerId == userId);
-    
-    if (quest == null) return Results.NotFound();
-    if (!quest.IsCompleted) return Results.BadRequest("Quest not completed yet.");
-    if (quest.IsClaimed) return Results.BadRequest("Reward already claimed.");
 
+    await using var tx = await db.Database.BeginTransactionAsync();
     try
     {
-        quest.IsClaimed = true;
-        
-        var success = await premiumService.AdjustBalanceAsync(userId, quest.RewardCredits, TransactionType.QuestReward, quest.Id.ToString());
-        
-        if (!success)
-            return Results.BadRequest("Failed to claim reward.");
+        var rows = await db.PlayerQuests
+            .Where(q => q.Id == questId && q.PlayerId == userId && !q.IsClaimed && q.CurrentValue >= q.TargetValue)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(q => q.IsClaimed, true));
 
-        var player = await db.Players.FindAsync(userId);
-        return Results.Ok(new { NewBalance = player?.PremiumCredits ?? 0 });
+        if (rows != 1)
+        {
+            await tx.RollbackAsync();
+            return Results.BadRequest("Quest is not complete, or the reward was already claimed.");
+        }
+
+        var reward = await db.PlayerQuests.AsNoTracking()
+            .Where(q => q.Id == questId)
+            .Select(q => q.RewardCredits)
+            .FirstAsync();
+
+        var success = await premiumService.AdjustBalanceAsync(
+            userId, reward, TransactionType.QuestReward, questId.ToString(), manageTransaction: false);
+
+        if (!success)
+        {
+            await tx.RollbackAsync();
+            return Results.BadRequest("Failed to claim reward.");
+        }
+
+        await tx.CommitAsync();
+        var balance = await db.Players.AsNoTracking()
+            .Where(p => p.Id == userId)
+            .Select(p => p.PremiumCredits)
+            .FirstAsync();
+        return Results.Ok(new { NewBalance = balance });
     }
     catch (Exception ex)
     {
+        await tx.RollbackAsync();
         return Results.Conflict(ex.Message);
     }
 });
 
 var storeApi = app.MapGroup("/api/store").RequireAuthorization();
 
+storeApi.MapGet("/", async (ClaimsPrincipal user, NebulaDbContext db) =>
+{
+    var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    var balance = await db.Players.AsNoTracking()
+        .Where(p => p.Id == userId)
+        .Select(p => p.PremiumCredits)
+        .FirstOrDefaultAsync();
+
+    var owned = await db.PlayerCosmetics.AsNoTracking()
+        .Where(pc => pc.PlayerId == userId)
+        .ToListAsync();
+
+    var items = await db.CosmeticItems.AsNoTracking().OrderBy(i => i.PriceInCoins).ToListAsync();
+
+    return Results.Ok(new
+    {
+        Balance = balance,
+        Items = items.Select(item =>
+        {
+            var inventory = owned.FirstOrDefault(o => o.CosmeticItemId == item.Id);
+            return new
+            {
+                item.Id,
+                item.Name,
+                item.Description,
+                item.PriceInCoins,
+                item.AssetRef,
+                IsOwned = inventory != null,
+                IsEquipped = inventory?.IsEquipped ?? false
+            };
+        })
+    });
+});
+
 storeApi.MapPost("/buy/{itemId}", async (int itemId, ClaimsPrincipal user, NebulaDbContext db, PremiumCurrencyService premiumService) =>
 {
     var userId = Guid.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    // 1. Fetch the item definition from the database
-    var item = await db.Set<CosmeticItem>().FindAsync(itemId);
-    if (item == null) return Results.NotFound("Item does not exist.");
-
-    // 2. Check if the player already owns it
-    var alreadyOwns = await db.Set<PlayerCosmetic>()
-        .AnyAsync(pc => pc.PlayerId == userId && pc.CosmeticItemId == itemId);
-    if (alreadyOwns) return Results.BadRequest("You already own this item.");
-
-    // 3. We use the PremiumCurrencyService which handles its own internal transaction and ledger!
-    // We pass a negative amount because it's a purchase.
-    var success = await premiumService.AdjustBalanceAsync(
-        userId, 
-        -item.PriceInCoins, 
-        Nebula.Domain.Entities.TransactionType.StorePurchase, 
-        $"Cosmetic_{itemId}"
-    );
-
-    if (!success) return Results.BadRequest("Insufficient Syndicate Coins.");
-
-    // 4. Add the item to their inventory
-    var inventoryRecord = new PlayerCosmetic
+    await using var tx = await db.Database.BeginTransactionAsync();
+    try
     {
-        PlayerId = userId,
-        CosmeticItemId = itemId
-    };
+        var item = await db.Set<CosmeticItem>().FindAsync(itemId);
+        if (item == null) return Results.NotFound("Item does not exist.");
 
-    db.Set<PlayerCosmetic>().Add(inventoryRecord);
-    await db.SaveChangesAsync();
+        var alreadyOwns = await db.Set<PlayerCosmetic>()
+            .AnyAsync(pc => pc.PlayerId == userId && pc.CosmeticItemId == itemId);
+        if (alreadyOwns)
+        {
+            await tx.RollbackAsync();
+            return Results.BadRequest("You already own this item.");
+        }
 
-    return Results.Ok(new { Message = "Purchase successful!", Item = item.Name });
+        var success = await premiumService.AdjustBalanceAsync(
+            userId,
+            -item.PriceInCoins,
+            TransactionType.StorePurchase,
+            $"Cosmetic_{userId:N}_{itemId}_{Guid.NewGuid():N}",
+            manageTransaction: false);
+
+        if (!success)
+        {
+            await tx.RollbackAsync();
+            return Results.BadRequest("Insufficient Syndicate Coins.");
+        }
+
+        db.Set<PlayerCosmetic>().Add(new PlayerCosmetic
+        {
+            PlayerId = userId,
+            CosmeticItemId = itemId
+        });
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
+
+        return Results.Ok(new { Message = "Purchase successful!", Item = item.Name });
+    }
+    catch (DbUpdateException)
+    {
+        await tx.RollbackAsync();
+        return Results.Conflict("Purchase could not be completed. Try again.");
+    }
 });
 
 storeApi.MapPost("/equip/{itemId}", async (int itemId, ClaimsPrincipal user, NebulaDbContext db) =>
@@ -461,12 +613,31 @@ storeApi.MapPost("/equip/{itemId}", async (int itemId, ClaimsPrincipal user, Neb
     return Results.Ok();
 });
 
+app.MapGet("/api/editions", () =>
+    Results.Ok(Nebula.Server.Models.PlatformCatalog.All.Select(e => new
+    {
+        e.Sku,
+        e.Name,
+        e.Platform,
+        e.Blurb,
+        PriceUsd = e.PriceCents / 100m,
+        e.Coins,
+        e.FreeToPlay
+    })));
+
 var paymentsApi = app.MapGroup("/api/payments");
 
 // 1. Endpoint to start the checkout process (Requires Auth)
-paymentsApi.MapPost("/checkout", async (ClaimsPrincipal user) =>
+paymentsApi.MapPost("/checkout", async (Nebula.Server.Models.CheckoutRequest body, ClaimsPrincipal user, IConfiguration config) =>
 {
+    var edition = Nebula.Server.Models.PlatformCatalog.Paid(body.Sku);
+    if (edition == null) return Results.BadRequest("Unknown edition.");
+
+    if (string.IsNullOrWhiteSpace(config["Stripe:SecretKey"]))
+        return Results.BadRequest("Card checkout is not configured on this server yet. Browser matches are free.");
+
     var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    var clientUrl = (config["Client:PublicUrl"] ?? "http://localhost:5094").TrimEnd('/');
 
     var options = new SessionCreateOptions
     {
@@ -477,31 +648,38 @@ paymentsApi.MapPost("/checkout", async (ClaimsPrincipal user) =>
             {
                 PriceData = new SessionLineItemPriceDataOptions
                 {
-                    UnitAmount = 500, // $5.00 in cents
+                    UnitAmount = edition.PriceCents,
                     Currency = "usd",
                     ProductData = new SessionLineItemPriceDataProductDataOptions
                     {
-                        Name = "1,000 Syndicate Coins",
+                        Name = $"Nebula {edition.Name}",
+                        Description = edition.Blurb
                     },
                 },
                 Quantity = 1,
             },
         },
         Mode = "payment",
-        SuccessUrl = "https://localhost:5001/store?success=true",
-        CancelUrl = "https://localhost:5001/store?canceled=true",
-        // CRITICAL: We pass the UserId via metadata so the webhook knows who to credit
+        SuccessUrl = $"{clientUrl}/editions?success=true",
+        CancelUrl = $"{clientUrl}/editions?canceled=true",
         Metadata = new Dictionary<string, string>
         {
             { "UserId", userId },
-            { "CreditsAmount", "1000" } 
+            { "CreditsAmount", edition.Coins.ToString() },
+            { "Sku", edition.Sku }
         }
     };
 
-    var service = new SessionService();
-    Session session = await service.CreateAsync(options);
-
-    return Results.Ok(new { Url = session.Url });
+    try
+    {
+        var service = new SessionService();
+        Session session = await service.CreateAsync(options);
+        return Results.Ok(new { Url = session.Url });
+    }
+    catch (StripeException ex)
+    {
+        return Results.BadRequest($"Checkout could not start. {ex.Message}");
+    }
 }).RequireAuthorization();
 
 // 2. Endpoint to listen for Stripe Webhooks (NO Auth - Stripe calls this directly)
@@ -697,6 +875,54 @@ appLifetime.ApplicationStopping.Register(() =>
         Console.WriteLine("[LiveOps] Waiting for active matches to finish before shutting down...");
     }
 });
+
+static async Task EnsureDailyQuestsAsync(NebulaDbContext db, Guid userId)
+{
+    var now = DateTime.UtcNow;
+    var hasActive = await db.PlayerQuests.AnyAsync(q => q.PlayerId == userId && q.ExpirationDateUTC > now);
+    if (hasActive) return;
+
+    var expires = now.Date.AddDays(1);
+    db.PlayerQuests.AddRange(
+        new PlayerQuest
+        {
+            PlayerId = userId,
+            Type = QuestType.PlayMatches,
+            Description = "Finish one extraction",
+            TargetValue = 1,
+            RewardCredits = 50,
+            ExpirationDateUTC = expires
+        },
+        new PlayerQuest
+        {
+            PlayerId = userId,
+            Type = QuestType.WinMatches,
+            Description = "Win one extraction",
+            TargetValue = 1,
+            RewardCredits = 100,
+            ExpirationDateUTC = expires
+        },
+        new PlayerQuest
+        {
+            PlayerId = userId,
+            Type = QuestType.DeployDrones,
+            Description = "Deploy 3 drones",
+            TargetValue = 3,
+            RewardCredits = 75,
+            ExpirationDateUTC = expires
+        },
+        new PlayerQuest
+        {
+            PlayerId = userId,
+            Type = QuestType.UseSabotage,
+            Description = "Fire one EMP",
+            TargetValue = 1,
+            RewardCredits = 75,
+            ExpirationDateUTC = expires
+        });
+
+    await db.SaveChangesAsync();
+}
 
 app.Run();
 
